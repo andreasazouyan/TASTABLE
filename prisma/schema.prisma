@@ -1,0 +1,606 @@
+// Tastable data model (PostgreSQL: local Postgres in development, Neon when hosted).
+//
+// Conventions
+// - Money is stored as integer cents (USD by default). Never floats.
+// - Multi-value fields (tags, dietary options, ...) are
+//   comma-separated strings, parsed and validated in src/lib/domain/lists.ts.
+// - Rows created by the seed are FICTIONAL demo content and carry isFictional / isDemo = true.
+// - Payments are SIMULATED. No card numbers, CVCs or processor tokens are ever stored.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+/// Exactly four experience categories. Host type is a separate dimension (HostType).
+enum ExperienceCategory {
+  SUPPER_CLUB_PRIVATE_DINING
+  COOKING_CLASS_WORKSHOP
+  POPUP_EXCLUSIVE
+  SOCIAL_CULINARY
+}
+
+/// Who is hosting. Never use this as an experience category.
+enum HostType {
+  PRIVATE_CHEF
+  CREATOR_INFLUENCER
+  CULINARY_PROFESSIONAL
+  SUPPER_CLUB_ORGANIZER
+  OTHER
+}
+
+enum UserRole {
+  GUEST
+  HOST
+  ADMIN
+}
+
+/// Research: some guests want to meet strangers, others prefer friends or a partner.
+enum SocialAtmosphere {
+  MEET_NEW_PEOPLE // Communal seating, great solo
+  BRING_YOUR_PEOPLE // Best with friends or a partner
+  EITHER_WAY // Works solo or as a group
+}
+
+enum PublicationStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+  CANCELLED
+  ARCHIVED
+}
+
+enum VenueRequestStatus {
+  SUBMITTED
+  IN_REVIEW
+  CLOSED
+}
+
+/// The shape of the event, independent of category.
+enum EventFormat {
+  SEATED_DINNER
+  CHEFS_TABLE
+  HANDS_ON_CLASS
+  DEMONSTRATION
+  TASTING
+  STANDING_RECEPTION
+  WALKING_TOUR
+  BRUNCH
+}
+
+enum SessionStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum VenueType {
+  RESTAURANT
+  PRIVATE_HOME
+  LOFT
+  ROOFTOP
+  STUDIO_KITCHEN
+  GALLERY
+  BAR
+  OUTDOOR
+  SECRET_LOCATION
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum CancellationActor {
+  GUEST
+  HOST
+  SYSTEM
+}
+
+/// Simulated payment lifecycle. There is no real processor behind these values.
+enum SimulatedPaymentStatus {
+  SIMULATED_PAID
+  SIMULATED_FAILED
+  SIMULATED_REFUNDED
+  SIMULATED_PARTIALLY_REFUNDED
+}
+
+enum TicketStatus {
+  VALID
+  CHECKED_IN
+  CANCELLED
+}
+
+enum WaitlistStatus {
+  WAITING
+  NOTIFIED
+  CONVERTED
+  EXPIRED
+  CANCELLED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+enum ExpenseCategory {
+  INGREDIENTS
+  BEVERAGES
+  VENUE
+  STAFF
+  EQUIPMENT
+  MARKETING
+  OTHER
+}
+
+enum CalendarVisibility {
+  PRIVATE
+  FRIENDS
+  PUBLIC
+}
+
+// ─── Identity ────────────────────────────────────────────────────────────────
+
+/// Demo identity. Authentication is simulated (persona picker + signed cookie).
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      UserRole @default(GUEST)
+  avatarUrl String?
+  isDemo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  guestProfile GuestProfile?
+  hostProfile  HostProfile?
+}
+
+model GuestProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName      String
+  homeNeighborhood String?
+  bio              String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  preferences         GuestPreferences?
+  calendarSharing     CalendarSharingPreference?
+  bookings            Booking[]
+  saved               SavedExperience[]
+  waitlistEntries     WaitlistEntry[]
+  invitationsSent     EventInvitation[]          @relation("InvitationsSent")
+  invitationsReceived EventInvitation[]          @relation("InvitationsReceived")
+}
+
+/// Set during optional onboarding, editable later. Drives deterministic recommendations.
+model GuestPreferences {
+  id                     String            @id @default(cuid())
+  guestProfileId         String            @unique
+  guestProfile           GuestProfile      @relation(fields: [guestProfileId], references: [id], onDelete: Cascade)
+  /// Neighborhood key from src/lib/domain/neighborhoods.ts, or "nyc" for the whole city.
+  locationKey            String            @default("nyc")
+  /// Travel radius in miles. Null means anywhere in NYC.
+  travelRadiusMiles      Int?
+  /// Comma-separated cuisine keys.
+  favoriteCuisines       String            @default("")
+  /// Comma-separated ExperienceCategory values.
+  favoriteCategories     String            @default("")
+  /// Comma-separated motivation keys (see src/lib/domain/motivations.ts).
+  motivations            String            @default("")
+  onboardingCompletedAt  DateTime?
+  onboardingSkippedAt    DateTime?
+  /// Comma-separated dietary needs, e.g. "vegetarian,nut-free".
+  dietaryRestrictions    String            @default("")
+  /// Comma-separated neighborhood names.
+  preferredNeighborhoods String            @default("")
+  socialAtmosphere       SocialAtmosphere?
+  /// Maximum ticket price per person the guest is comfortable with. Null = no limit.
+  maxBudgetCents         Int?
+  /// Comma-separated host slugs the guest follows (e.g. a favourite creator).
+  followedHosts          String            @default("")
+  emailNewExperiences    Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+}
+
+model CalendarSharingPreference {
+  id                   String             @id @default(cuid())
+  guestProfileId       String             @unique
+  guestProfile         GuestProfile       @relation(fields: [guestProfileId], references: [id], onDelete: Cascade)
+  visibility           CalendarVisibility @default(PRIVATE)
+  showExperienceTitles Boolean            @default(true)
+  /// Enables a private iCal feed URL built from shareToken.
+  icalFeedEnabled      Boolean            @default(false)
+  /// Non-guessable token for the public shared-calendar link. Null when sharing is revoked.
+  shareToken           String?            @unique
+  sharedAt             DateTime?
+  revokedAt            DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  /// Only sessions the guest explicitly chose to show. Bookings are private by default.
+  items CalendarShareItem[]
+}
+
+/// One session a guest chose to show on their shared calendar. Exposes event info only:
+/// never attendee names, emails, ticket counts or booking references.
+model CalendarShareItem {
+  id           String                    @id @default(cuid())
+  preferenceId String
+  preference   CalendarSharingPreference @relation(fields: [preferenceId], references: [id], onDelete: Cascade)
+  sessionId    String
+  session      ExperienceSession         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime                  @default(now())
+
+  @@unique([preferenceId, sessionId])
+}
+
+model HostProfile {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug                  String    @unique
+  displayName           String
+  hostType              HostType
+  tagline               String
+  /// Short professional background, e.g. "Former sushi apprentice in Osaka".
+  background            String
+  bio                   String
+  homeNeighborhood      String?
+  /// Comma-separated cuisine keys the host specialises in.
+  cuisineExpertise      String    @default("")
+  /// Credentials, one per line (training, residencies, press). Self-reported.
+  credentials           String    @default("")
+  profilePhotoUrl       String?
+  onboardingCompletedAt DateTime?
+  instagramHandle       String?
+  tiktokHandle          String?
+  followerCount         Int       @default(0)
+  verified              Boolean   @default(false)
+  isFictional           Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  experiences          Experience[]
+  venues               Venue[]
+  expenses             EventExpense[]
+  cancellationPolicies CancellationPolicy[]
+  venueRequests        VenueAssistanceRequest[]
+
+  @@index([hostType])
+}
+
+// ─── Catalog ─────────────────────────────────────────────────────────────────
+
+model Venue {
+  id                 String       @id @default(cuid())
+  slug               String       @unique
+  name               String
+  type               VenueType
+  neighborhood       String
+  borough            String
+  city               String       @default("New York")
+  /// Fictional street address. Hidden from guests until booking when isSecretLocation is true.
+  addressLine        String
+  /// Approximate coordinates for distance filtering. Fictional venues use neighborhood centroids.
+  latitude           Float
+  longitude          Float
+  maxCapacity        Int
+  isSecretLocation   Boolean      @default(false)
+  /// "Venue to be confirmed" placeholder for draft events. Experiences on it cannot be published.
+  isPlaceholder      Boolean      @default(false)
+  accessibilityNotes String?
+  /// Optional host who operates the venue (venue partners).
+  managedByHostId    String?
+  managedByHost      HostProfile? @relation(fields: [managedByHostId], references: [id], onDelete: SetNull)
+  isFictional        Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  experiences Experience[]
+
+  @@index([neighborhood])
+}
+
+/// Refund rules. Platform templates have no host; hosts can create their own terms
+/// and attach them per experience. Refund math lives in src/lib/booking/refunds.ts.
+model CancellationPolicy {
+  id                   String       @id @default(cuid())
+  /// Stable key, unique per owner: e.g. STANDARD_48H, FLEXIBLE_24H, FINAL_SALE.
+  key                  String
+  /// Null for platform templates; set for host-defined terms.
+  hostId               String?
+  host                 HostProfile? @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  name                 String
+  summary              String
+  /// Full refund if cancelled MORE than this many hours before the session starts.
+  fullRefundHours      Int
+  /// Partial refund if cancelled more than this many hours before (and not in the full window).
+  /// Null means there is no partial tier.
+  partialRefundHours   Int?
+  partialRefundPercent Int          @default(0)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  experiences Experience[]
+
+  @@unique([hostId, key])
+}
+
+model Experience {
+  id                   String             @id @default(cuid())
+  slug                 String             @unique
+  title                String
+  summary              String
+  description          String
+  category             ExperienceCategory
+  cuisine              String
+  /// Comma-separated lowercase tags.
+  tags                 String             @default("")
+  /// Comma-separated dietary options the host can accommodate (see DIETARY_OPTIONS).
+  dietaryOptions       String             @default("")
+  socialAtmosphere     SocialAtmosphere   @default(EITHER_WAY)
+  format               EventFormat
+  /// Comma-separated social occasions: DATE_NIGHT, BRING_A_FRIEND, MEET_NEW_PEOPLE,
+  /// LEARN_SOMETHING_NEW, SPECIAL_OCCASION (see src/lib/domain/occasions.ts).
+  occasions            String             @default("")
+  /// JSON array of short unique selling points.
+  highlights           String             @default("[]")
+  /// JSON array of { title, description } menu courses or activities.
+  menu                 String             @default("[]")
+  /// JSON array of what's included (drinks, recipes, take-home items...).
+  inclusions           String             @default("[]")
+  status               PublicationStatus  @default(DRAFT)
+  publishedAt          DateTime?
+  hostId               String
+  host                 HostProfile        @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  venueId              String
+  venue                Venue              @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  cancellationPolicyId String
+  cancellationPolicy   CancellationPolicy @relation(fields: [cancellationPolicyId], references: [id], onDelete: Restrict)
+  /// Standard ticket price in cents. Sessions may override it.
+  ticketPriceCents     Int
+  currency             String             @default("USD")
+  durationMinutes      Int
+  /// Default capacity for new sessions. The bookable limit lives on ExperienceSession.capacity.
+  defaultCapacity      Int
+  minimumAge           Int?
+  featured             Boolean            @default(false)
+  isFictional          Boolean            @default(true)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  photos     ExperiencePhoto[]
+  dailyStats ExperienceDailyStat[]
+  sessions   ExperienceSession[]
+  saved      SavedExperience[]
+  expenses   EventExpense[]
+
+  @@index([category, status])
+  @@index([status, featured])
+  @@index([hostId])
+  @@index([venueId])
+}
+
+model ExperiencePhoto {
+  id           String     @id @default(cuid())
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  url          String
+  alt          String
+  /// Attribution, e.g. "Unsplash". Placeholder photos never depict the fictional hosts.
+  credit       String?
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@index([experienceId, sortOrder])
+}
+
+/// A dated occurrence. Capacity and availability are tracked here, not on Experience.
+model ExperienceSession {
+  id                 String        @id @default(cuid())
+  experienceId       String
+  experience         Experience    @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  startsAt           DateTime
+  endsAt             DateTime
+  capacity           Int
+  /// Denormalized count of seats held by CONFIRMED/PENDING bookings. Updated in the same transaction.
+  seatsReserved      Int           @default(0)
+  priceOverrideCents Int?
+  status             SessionStatus @default(SCHEDULED)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  bookings    Booking[]
+  waitlist    WaitlistEntry[]
+  invitations EventInvitation[]
+  expenses    EventExpense[]
+  sharedIn    CalendarShareItem[]
+
+  @@unique([experienceId, startsAt])
+  @@index([startsAt, status])
+}
+
+// ─── Bookings ────────────────────────────────────────────────────────────────
+
+model Booking {
+  id                   String                 @id @default(cuid())
+  /// Human-friendly reference shown to guests, e.g. TBL-7K3M9Q.
+  reference            String                 @unique
+  guestId              String
+  guest                GuestProfile           @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  sessionId            String
+  session              ExperienceSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  status               BookingStatus          @default(PENDING)
+  ticketCount          Int
+  unitPriceCents       Int
+  /// unitPriceCents * ticketCount
+  subtotalCents        Int
+  /// Simulated platform service fee (see src/lib/booking/pricing.ts).
+  serviceFeeCents      Int
+  /// subtotalCents + serviceFeeCents
+  totalPriceCents      Int
+  refundAmountCents    Int                    @default(0)
+  /// Lead guest contact details (demo only).
+  contactName          String
+  contactEmail         String
+  /// Free-text dietary requirements for the whole booking.
+  dietaryRequirements  String?
+  /// When the guest acknowledged the cancellation policy at checkout, with a snapshot of its terms.
+  policyAcknowledgedAt DateTime
+  policySnapshot       String
+  currency             String                 @default("USD")
+  cancelledAt          DateTime?
+  cancelledBy          CancellationActor?
+  cancellationReason   String?
+  paymentStatus        SimulatedPaymentStatus
+  /// Simulated processor reference (sim_...). Never a real charge id.
+  paymentReference     String                 @unique
+  isFictional          Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  tickets     BookingTicket[]
+  invitations EventInvitation[]
+
+  @@index([guestId, status])
+  @@index([sessionId, status])
+}
+
+/// One digital ticket per seat. A booking can hold several.
+model BookingTicket {
+  id            String       @id @default(cuid())
+  bookingId     String
+  booking       Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  /// Scannable ticket code, unique across the platform.
+  code          String       @unique
+  attendeeName  String?
+  attendeeEmail String?
+  dietaryNotes  String?
+  status        TicketStatus @default(VALID)
+  checkedInAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([bookingId])
+}
+
+model SavedExperience {
+  guestId      String
+  guest        GuestProfile @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  experienceId String
+  experience   Experience   @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  createdAt    DateTime     @default(now())
+
+  @@id([guestId, experienceId])
+  @@index([experienceId])
+}
+
+model WaitlistEntry {
+  id         String            @id @default(cuid())
+  sessionId  String
+  session    ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  guestId    String
+  guest      GuestProfile      @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  partySize  Int               @default(1)
+  status     WaitlistStatus    @default(WAITING)
+  notifiedAt DateTime?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([sessionId, guestId])
+  @@index([sessionId, status, createdAt])
+}
+
+/// A guest inviting a friend to a session (sharing is a key research insight).
+model EventInvitation {
+  id           String            @id @default(cuid())
+  sessionId    String
+  session      ExperienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  inviterId    String
+  inviter      GuestProfile      @relation("InvitationsSent", fields: [inviterId], references: [id], onDelete: Cascade)
+  /// Set when the invitation shares seats from an existing booking.
+  bookingId    String?
+  booking      Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  inviteeName  String?
+  inviteeEmail String
+  /// Optional: invitee's Tastable guest profile, so the invite shows on their calendar.
+  inviteeId    String?
+  invitee      GuestProfile?     @relation("InvitationsReceived", fields: [inviteeId], references: [id], onDelete: SetNull)
+  message      String?
+  token        String            @unique
+  status       InvitationStatus  @default(PENDING)
+  respondedAt  DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([sessionId, inviterId, inviteeEmail])
+  @@index([inviteeEmail])
+}
+
+// ─── Host operations ─────────────────────────────────────────────────────────
+
+model EventExpense {
+  id           String             @id @default(cuid())
+  hostId       String
+  host         HostProfile        @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  experienceId String
+  experience   Experience         @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  /// Optional: expenses can belong to one session or to the experience overall.
+  sessionId    String?
+  session      ExperienceSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  category     ExpenseCategory
+  description  String
+  amountCents  Int
+  currency     String             @default("USD")
+  incurredAt   DateTime
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([hostId, incurredAt])
+  @@index([experienceId])
+}
+
+/// A host asking for help finding a venue. Tastable has NOT secured a venue when this exists.
+model VenueAssistanceRequest {
+  id             String             @id @default(cuid())
+  hostId         String
+  host           HostProfile        @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  neighborhoods  String             @default("")
+  guestCount     Int
+  preferredDates String
+  budgetCents    Int?
+  needsKitchen   Boolean            @default(true)
+  notes          String?
+  status         VenueRequestStatus @default(SUBMITTED)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([hostId])
+}
+
+/// Simulated daily listing views, used for conversion metrics in Culinary Trends.
+model ExperienceDailyStat {
+  id           String     @id @default(cuid())
+  experienceId String
+  experience   Experience @relation(fields: [experienceId], references: [id], onDelete: Cascade)
+  date         DateTime
+  views        Int        @default(0)
+
+  @@unique([experienceId, date])
+}

@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local sqlite
+/prisma/*.db
+/prisma/*.db-journal
+
+# prisma client
+/src/generated/
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+!.env.example

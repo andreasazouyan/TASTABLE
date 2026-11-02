@@ -1,0 +1,114 @@
+# Tastable: guide for AI assistants and contributors
+
+Tastable is a curated marketplace for unique culinary experiences in New York City.
+Tagline: **"Discover experiences worth sharing."**
+
+**This is an advanced prototype, not a production payments platform.** Every transaction is
+simulated, authentication is a demo persona switch, and all hosts, events, guests and figures
+are fictional. Never add real charges, never collect card data, never imply sample content is real.
+
+@AGENTS.md
+
+## Audience
+
+New Yorkers aged roughly **20–35**. Three reference personas (seeded as demo guests, see
+`src/lib/domain/personas.ts`):
+
+| Persona | Who | Budget | What they want |
+|---|---|---|---|
+| **Zoe Park, 24** | Master's student, East Village | Low: under $60 | Unique, stylish nights out with friends; pop-ups and socials |
+| **Jordan Lee, 30** | Working professional, Williamsburg | Medium: up to $100 | Learn cooking skills while meeting new people |
+| **Sofia Marin, 34** | Loves beautiful spaces and decor | High: no limit | Will pay a lot to attend events by one creator she follows (Priya Raman) |
+
+Alex Rivera (27, new in town) is the fresh, un-onboarded guest for trying onboarding.
+
+What this means in practice:
+- Keep a real spread of prices ($35–$180) with enough under $60 (the "Under $60" collection).
+- Budget is a first-class preference: onboarding asks for it; recommendations leave out
+  over-budget items (except from followed hosts) and say "within your $60 budget".
+- Following a host is the strongest recommendation signal ("Hosted by X, whom you follow").
+- Copy is warm, confident and concise; editorial, not corporate or "SaaS". No emojis.
+
+## The four categories (exactly four)
+
+| Enum | Name | Slug |
+|---|---|---|
+| `SUPPER_CLUB_PRIVATE_DINING` | Supper Clubs & Private Dining | `supper-clubs` |
+| `COOKING_CLASS_WORKSHOP` | Cooking Classes & Workshops | `classes` |
+| `POPUP_EXCLUSIVE` | Pop-Ups & Exclusive Experiences | `pop-ups` |
+| `SOCIAL_CULINARY` | Social Culinary Experiences | `social` |
+
+Single source of truth: `src/lib/domain/categories.ts`. **Host type** (private chef, creator,
+culinary professional, supper club organizer, other) is a separate dimension, never a category.
+
+## Architecture
+
+- **Next.js 16 App Router** with `cacheComponents` (Partial Prerendering). Read
+  `node_modules/next/dist/docs/` before using an API you aren't sure of. Rules that bite:
+  - Uncached data (cookies, DB reads, the clock) must render inside `<Suspense>`.
+  - Read the time with `requestNow()` (`src/lib/request-clock.ts`) in server components.
+  - Client components using `usePathname`/`useSearchParams` need a Suspense boundary.
+  - `PageProps<"/route">` / `LayoutProps` are global types from `next typegen`.
+- **Prisma 7 + SQLite** via `@prisma/adapter-better-sqlite3`. Client is generated to
+  `src/generated/prisma` (import from `@/generated/prisma/client` or `/enums`). After schema
+  changes: `npx prisma migrate dev --name x` **then** `npx prisma generate` (v7 doesn't auto-generate).
+  Lists are comma-separated strings; structured text (menu, highlights) is JSON.
+- **Tailwind v4** tokens in `src/app/globals.css`; **shadcn/ui**-style components hand-written in
+  `src/components/ui` (new-york style on `radix-ui`).
+- Zod 4 for every input (`src/lib/validation`), Recharts for charts, Lucide icons.
+
+```
+src/
+  app/(guest)/       guest pages: home, discover, experiences, book, bookings, calendar, saved, profile, onboarding, sign-in, c/[token], invite/[token]
+  app/host/          host dashboard: overview, events (+ wizard), reservations, finances, trends, profile, venue-request
+  app/api/           .ics exports
+  components/        ui/, site/, experiences/, discover/, booking/, onboarding/, host/
+  lib/               pure logic (no DB): booking/, discovery/, analytics/, calendar/, domain/, validation/, auth/, clock
+  server/actions/    server actions ("use server"), thin: validate → service → revalidate
+  server/services/   transactional domain logic (bookings, host events) taking a Prisma client
+  server/queries/    read models for pages
+prisma/              schema, migrations, seed.ts + seed-data.ts
+tests/unit           pure logic (Vitest)
+tests/integration    services against a freshly seeded prisma/test.db (Vitest)
+tests/e2e            Playwright journeys against a production build and prisma/e2e.db
+```
+
+## Conventions and invariants
+
+- **One server clock**: `serverNow()` (`src/lib/clock.ts`); honours `TASTABLE_FIXED_NOW`. Never call
+  `new Date()` for business logic. Dates display in `America/New_York`.
+- **Capacity lives on `ExperienceSession`** (`capacity`, `seatsReserved`). Bookings reserve seats with
+  an atomic conditional `UPDATE` inside the transaction. Never show a session with 0 seats as
+  available (`src/lib/booking/capacity.ts`).
+- **Refunds** are computed by `computeRefund()` from the event's `CancellationPolicy` and shown before
+  confirming. Cancellation is idempotent (conditional status transition).
+- **Authorization**: every host mutation goes through `assertOwnsExperience`. Guests only see their own
+  bookings. Shared calendars expose event-level data only, behind non-guessable, revocable tokens.
+- **Venues**: never claim Tastable secured a venue. "Venue to be confirmed" events stay drafts.
+- **Analytics** are derived from rows at request time, labelled as simulated, and insights only fire
+  above minimum sample sizes. No invented confidence or market claims.
+- Money is stored in integer cents. Platform fee 10% of net ticket revenue; guest service fee 6% capped at $25.
+
+## Demo data rules
+
+- Everything seeded is fictional and labelled (`isFictional`, "Sample listing", demo banner).
+  Emails use `@example.com`. Photos are Unsplash placeholders and don't depict the sample hosts.
+- The seed is deterministic (seeded LCG, fixed IDs) and wipes all tables first, so
+  `npm run demo:reset` always returns to the same state for the current clock.
+- Fixed tokens for demos: shared calendar `/c/demo-share-jordan-k7Qm2xV9pL4tR8wN3cY6`,
+  invitation `/invite/demo-invite-alex-Hq3Zt8LmV2nP6yR1sK9w`.
+
+## Workflow
+
+```bash
+npm run dev          # http://localhost:3000
+npm run typecheck    # next typegen + tsc
+npm run lint
+npm test             # Vitest unit + integration (builds prisma/test.db)
+npm run test:e2e     # Playwright (builds the app, uses prisma/e2e.db, port 3200)
+npm run demo:reset   # re-apply migrations and re-seed the demo data
+npm run build
+```
+
+Before finishing a change: typecheck, lint and `npm test` must pass; run the E2E suite for
+UI-flow changes. Don't claim tests pass unless you ran them.

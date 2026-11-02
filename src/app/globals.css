@@ -1,26 +1,151 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
+/*
+ * Tastable design tokens.
+ * Editorial, warm and restrained: ivory surfaces, charcoal ink, one terracotta accent.
+ * Components consume these through Tailwind utilities (bg-background, text-brand, ...).
+ * Token names follow shadcn/ui so generated components inherit the theme.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces */
+  --background: #faf7f2; /* warm ivory */
+  --foreground: #1f1d1b; /* deep charcoal */
+  --card: #fffdf9; /* off-white */
+  --card-foreground: #1f1d1b;
+  --popover: #fffdf9;
+  --popover-foreground: #1f1d1b;
+  --muted: #f2ede5;
+  --muted-foreground: #6b645c;
+  --secondary: #efe8dd;
+  --secondary-foreground: #1f1d1b;
+  --accent: #f3e6dc;
+  --accent-foreground: #7a3218;
+
+  /* Actions */
+  --primary: #1f1d1b; /* charcoal buttons */
+  --primary-foreground: #faf7f2;
+  --brand: #a8492a; /* restrained terracotta */
+  --brand-foreground: #fffdf9;
+  --brand-soft: #f3e6dc;
+  --destructive: #a12a2a;
+
+  /* Lines and focus */
+  --border: #e6ded2;
+  --input: #ddd4c6;
+  --ring: #a8492a;
+
+  /* Charts (host analytics) */
+  --chart-1: #b4532f;
+  --chart-2: #2a78d6;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #8a7f73;
+
+  /* Shape and depth */
+  --radius: 0.875rem;
+  --shadow-soft: 0 1px 2px rgb(31 29 27 / 0.04), 0 8px 24px -12px rgb(31 29 27 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(31 29 27 / 0.05), 0 18px 40px -18px rgb(31 29 27 / 0.22);
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 10px);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-lift: var(--shadow-lift);
+  --ease-soft: var(--ease-out-soft);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "ss01", "cv11";
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+    font-optical-sizing: auto;
+  }
+  ::selection {
+    background: var(--brand-soft);
+    color: var(--accent-foreground);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@utility container-page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 80rem;
+  padding-inline: 1rem;
+  @media (width >= 40rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 2rem;
+  }
+}
+
+@utility eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brand);
 }
