@@ -197,3 +197,24 @@ describe("profile edits flow into aggregated insights", () => {
     expect((await getAudienceInsights()).eligibleGuests).toBe(eligible);
   });
 });
+
+describe("public host profile", () => {
+  it("shows rating, sorted reviews, past and upcoming events without exposing guest identities", async () => {
+    const { getPublicHostProfile } = await import("@/server/queries/host-profile");
+    const highest = await getPublicHostProfile("luca-moretti", now, "highest");
+    const lowest = await getPublicHostProfile("luca-moretti", now, "lowest");
+    expect(highest).not.toBeNull();
+    const ratings = highest!.reviews.map((r) => r.rating);
+    expect(ratings).toEqual([...ratings].sort((a, b) => b - a));
+    expect(lowest!.reviews.map((r) => r.rating)).toEqual([...ratings].sort((a, b) => a - b));
+    expect(highest!.rating.count).toBe(highest!.reviews.length);
+    for (const r of highest!.reviews) {
+      expect(Object.keys(r)).not.toContain("guestId");
+      expect(Object.keys(r)).not.toContain("guest");
+      expect(r.reviewerFirstName).not.toContain(" ");
+    }
+    expect(highest!.upcoming.every((l) => l.host.slug === "luca-moretti")).toBe(true);
+    expect(highest!.past.every((e) => e.sessions.every((s) => s.startsAt < now))).toBe(true);
+    expect(await getPublicHostProfile("no-such-host", now, "recent")).toBeNull();
+  });
+});

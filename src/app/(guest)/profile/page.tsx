@@ -214,6 +214,14 @@ async function Profile() {
                   {r.editedAt && " · edited"}
                   {r.status === "UNDER_REVIEW" && " · being checked by our team, still visible"}
                   {r.status === "REMOVED" && " · removed by moderation"}
+                  {r.status !== "REMOVED" && (
+                    <>
+                      {" · "}
+                      <Link href={`/bookings/${r.booking.reference}/review`} className="font-medium text-foreground underline-offset-4 hover:underline">
+                        Edit review
+                      </Link>
+                    </>
+                  )}
                 </p>
               </li>
             ))}

@@ -98,7 +98,10 @@ tests/e2e            Playwright journeys against a production build and prisma/e
 - **Saves**: `Experience.saveCount` = unique savers, changed only via `src/server/services/saved.ts`.
 - **Reviews**: one per booking/session, verified by a checked-in ticket, relationships derived from
   the booking (`src/server/services/reviews.ts`). One rating calculation: `ratingSummary` in
-  `src/lib/reviews.ts`. Reports never hide a review automatically.
+  `src/lib/reviews.ts`. Reports never hide a review automatically (UNDER_REVIEW stays public and
+  counted; only `moderateReview` "remove" hides one). Guests leave/edit reviews at
+  `/bookings/[reference]/review`; public reviews show first names only. Public host profiles live
+  at `/hosts/[slug]` (`src/server/queries/host-profile.ts`).
 - **Event content**: structured menu sections, itinerary (minutes from start) and featured dishes;
   the legacy `Experience.menu` JSON is kept in sync by `saveEvent`. Guests see them through
   `EventMenu` ("The Menu" / "What You'll Cook" / "What You'll Enjoy", menu status) and

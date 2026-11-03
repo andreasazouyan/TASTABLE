@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CalendarPlus, Ticket } from "lucide-react";
+import { CalendarPlus, Star, Ticket } from "lucide-react";
 
 import { StatusBadge } from "@/components/booking/status-badge";
 import { EmptyState } from "@/components/site/empty-state";
@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { requireGuest } from "@/lib/auth/demo";
 import { formatDate, formatMoney, formatTime } from "@/lib/format";
 import { requestNow } from "@/lib/request-clock";
+import { ELIGIBILITY_MESSAGES, reviewEligibility } from "@/lib/reviews";
 import { cn } from "@/lib/utils";
 import { leaveWaitlistAction } from "@/server/actions/waitlist";
 import { getGuestBookings, getWaitlist, splitBookings, waitlistPosition, type BookingView, type GuestBooking } from "@/server/queries/bookings";
@@ -45,8 +46,10 @@ export default function BookingsPage(props: PageProps<"/bookings">) {
   );
 }
 
-function BookingRow({ b }: { b: GuestBooking }) {
+function BookingRow({ b, now }: { b: GuestBooking; now: Date }) {
   const e = b.session.experience;
+  const ended = b.status !== "CANCELLED" && b.session.endsAt <= now;
+  const eligibility = reviewEligibility(b, now);
   return (
     <li className="min-w-0">
       <Link
@@ -70,6 +73,25 @@ function BookingRow({ b }: { b: GuestBooking }) {
           </p>
         </div>
       </Link>
+      {ended && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 px-1 text-sm">
+          {b.review ? (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`/bookings/${b.reference}/review`}>
+                <Star aria-hidden /> Edit your review
+              </Link>
+            </Button>
+          ) : eligibility.eligible ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/bookings/${b.reference}/review`}>
+                <Star aria-hidden /> Leave a Review
+              </Link>
+            </Button>
+          ) : (
+            <span className="text-muted-foreground">{ELIGIBILITY_MESSAGES[eligibility.reason]}</span>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -135,7 +157,7 @@ async function Bookings({ searchParams }: PageProps<"/bookings">) {
       ) : groups[view as "upcoming" | "past" | "cancelled"].length ? (
         <ul className="grid gap-3 lg:grid-cols-2">
           {groups[view as "upcoming" | "past" | "cancelled"].map((b) => (
-            <BookingRow key={b.id} b={b} />
+            <BookingRow key={b.id} b={b} now={now} />
           ))}
         </ul>
       ) : (

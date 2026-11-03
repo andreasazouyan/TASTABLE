@@ -4,12 +4,13 @@ import { db } from "@/lib/db";
 
 const bookingInclude = {
   tickets: { orderBy: { createdAt: "asc" } },
+  review: { select: { id: true } },
   session: {
     include: {
       experience: {
         include: {
           venue: true,
-          host: { select: { displayName: true } },
+          host: { select: { displayName: true, slug: true } },
           cancellationPolicy: true,
           photos: { take: 1, orderBy: { sortOrder: "asc" } },
         },

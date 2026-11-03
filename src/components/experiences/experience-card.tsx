@@ -72,7 +72,12 @@ export function ExperienceCard({
           </Link>
         </h3>
         <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-          <span className="truncate">Hosted by {listing.host.displayName}</span>
+          <span className="truncate">
+            Hosted by{" "}
+            <Link href={`/hosts/${listing.host.slug}`} className="relative z-10 underline-offset-4 hover:text-foreground hover:underline">
+              {listing.host.displayName}
+            </Link>
+          </span>
           {listing.host.verified && <BadgeCheck className="size-3.5 shrink-0 text-brand" aria-label="Verified host" />}
         </p>
         {listing.hostRating && <HostRating rating={listing.hostRating} className="mt-1" />}

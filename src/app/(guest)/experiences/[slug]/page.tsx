@@ -9,7 +9,8 @@ import { ExperienceTimeline } from "@/components/experiences/experience-timeline
 import { HostRating } from "@/components/experiences/host-rating";
 import { sectionsFromLegacyMenu } from "@/lib/domain/event-content";
 import { SaveButton } from "@/components/experiences/save-button";
-import { getHostRating } from "@/server/queries/reviews";
+import { parseReviewSort, ReviewList, ReviewSortLinks, ReviewSummary } from "@/components/reviews/review-list";
+import { getAspectAverages, getExperienceRating, getHostRating, getPublicReviews } from "@/server/queries/reviews";
 import { SessionPicker, type PickerSession } from "@/components/experiences/session-picker";
 import { ShareButton } from "@/components/experiences/share-button";
 import { Photo } from "@/components/site/photo";
@@ -60,6 +61,12 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
       ? db.waitlistEntry.findMany({ where: { guestId, status: { in: ["WAITING", "NOTIFIED"] }, session: { experienceId: exp.id } }, select: { sessionId: true } })
       : [],
     getHostRating(exp.hostId),
+  ]);
+  const reviewSort = parseReviewSort(sp.reviews);
+  const [eventRating, eventAspects, eventReviews] = await Promise.all([
+    getExperienceRating(exp.id),
+    getAspectAverages({ experienceId: exp.id }),
+    getPublicReviews({ experienceId: exp.id }, reviewSort, 20, guestId),
   ]);
   const waitlistedIds = new Set(waitlisted.map((w) => w.sessionId));
   const following = (user?.guestProfile?.preferences?.followedHosts ?? "").split(",").includes(exp.host.slug);
@@ -241,13 +248,19 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
 
           <Section title="Your host" id="host">
             <div className="flex flex-col gap-5 sm:flex-row">
-              <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-full bg-brand-soft font-display text-2xl text-accent-foreground">
-                {exp.host.displayName[0]}
-              </span>
+              <Link href={`/hosts/${exp.host.slug}`} aria-hidden tabIndex={-1} className="shrink-0">
+                {exp.host.profilePhotoUrl ? (
+                  <Photo src={exp.host.profilePhotoUrl} alt="" theme="terracotta" sizes="64px" className="size-16 rounded-full" />
+                ) : (
+                  <span className="grid size-16 place-items-center rounded-full bg-brand-soft font-display text-2xl text-accent-foreground">{exp.host.displayName[0]}</span>
+                )}
+              </Link>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="flex items-center gap-1.5 font-display text-xl">
-                    {exp.host.displayName}
+                    <Link href={`/hosts/${exp.host.slug}`} className="underline-offset-4 hover:underline">
+                      {exp.host.displayName}
+                    </Link>
                     {exp.host.verified && <BadgeCheck className="size-5 text-brand" aria-label="Verified host (demo)" />}
                   </p>
                   <FollowButton hostSlug={exp.host.slug} hostName={exp.host.displayName} following={following} />
@@ -270,6 +283,21 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 )}
               </div>
             </div>
+          </Section>
+
+          <Section title="Reviews" id="reviews">
+            <ReviewSummary rating={eventRating} aspects={eventAspects} />
+            {eventReviews.length > 1 && (
+              <div className="mt-5 flex justify-end">
+                <ReviewSortLinks current={reviewSort} hrefFor={(s) => `${path}?${new URLSearchParams({ ...(sessionParam ? { session: sessionParam } : {}), ...(s === "recent" ? {} : { reviews: s }) })}#reviews`} />
+              </div>
+            )}
+            {eventReviews.length > 0 && <ReviewList reviews={eventReviews} signedIn={!!user} />}
+            <p className="mt-3 text-sm">
+              <Link href={`/hosts/${exp.host.slug}#reviews`} className="font-medium underline-offset-4 hover:underline">
+                All reviews for {exp.host.displayName}
+              </Link>
+            </p>
           </Section>
 
           <Section title="Cancellation policy" id="policy">
