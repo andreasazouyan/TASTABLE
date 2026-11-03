@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { nyDateTime } from "@/lib/clock";
 import { getNeighborhood } from "@/lib/domain/neighborhoods";
+import { normalizeDish, normalizeDishList } from "@/lib/domain/dishes";
+import { legacyMenuFromSections, sectionsFromLegacyMenu, stepDuration } from "@/lib/domain/event-content";
 import { serializeList } from "@/lib/domain/lists";
 import { publishProblems, type EventInput } from "@/lib/validation/event";
 import { cancelBooking } from "@/server/services/bookings";
@@ -147,7 +149,8 @@ export async function saveEvent(db: Db, hostId: string, input: EventInput, now: 
     socialAtmosphere: input.socialAtmosphere,
     dietaryOptions: serializeList(input.dietaryOptions),
     highlights: JSON.stringify(input.highlights),
-    menu: JSON.stringify(input.menu),
+    menu: JSON.stringify(input.menuSections ? legacyMenuFromSections(input.menuSections) : input.menu),
+    ...(input.menuStatus ? { menuStatus: input.menuStatus } : {}),
     inclusions: JSON.stringify(input.inclusions),
     ticketPriceCents: Math.round(input.ticketPriceDollars * 100),
     durationMinutes: input.durationMinutes,
@@ -174,6 +177,8 @@ export async function saveEvent(db: Db, hostId: string, input: EventInput, now: 
         data: { ...data, slug: await uniqueSlug(db, input.title), hostId, status: wantsPublish ? "PUBLISHED" : "DRAFT", publishedAt: wantsPublish ? now : null, createdAt: now },
       });
     }
+
+    await writeStructuredContent(tx, exp.id, input);
 
     // Photos: replace.
     await tx.experiencePhoto.deleteMany({ where: { experienceId: exp.id } });
@@ -206,15 +211,73 @@ export async function saveEvent(db: Db, hostId: string, input: EventInput, now: 
   });
 }
 
+type Tx = Parameters<Parameters<Db["$transaction"]>[0]>[0];
+
+/**
+ * Menu sections, featured dishes and itinerary. Sections are always rewritten (from the legacy
+ * flat menu when the client didn't send sections), so both representations stay in sync.
+ * Itinerary and featured dishes only change when the client sends them.
+ */
+async function writeStructuredContent(tx: Tx, experienceId: string, input: EventInput) {
+  const sections = input.menuSections ?? sectionsFromLegacyMenu(input.menu);
+  await tx.experienceMenuSection.deleteMany({ where: { experienceId } });
+  for (const [i, section] of sections.entries()) {
+    await tx.experienceMenuSection.create({
+      data: {
+        experienceId,
+        title: section.title,
+        description: section.description,
+        sortOrder: i,
+        items: {
+          create: section.items.map((item, j) => ({
+            name: item.name,
+            description: item.description,
+            dishKey: item.dish ? (normalizeDish({ key: item.dish, custom: item.dish })?.dishKey ?? null) : null,
+            dietaryTags: serializeList(item.dietaryTags),
+            imageUrl: item.imageUrl ?? null,
+            imageAlt: item.imageAlt ?? null,
+            sortOrder: j,
+          })),
+        },
+      },
+    });
+  }
+  if (input.itinerary) {
+    await tx.experienceItineraryStep.deleteMany({ where: { experienceId } });
+    if (input.itinerary.length) {
+      await tx.experienceItineraryStep.createMany({
+        data: input.itinerary.map((step, i) => ({
+          experienceId,
+          sortOrder: i,
+          startOffsetMinutes: step.startOffsetMinutes,
+          durationMinutes: stepDuration(step),
+          title: step.title,
+          description: step.description,
+        })),
+      });
+    }
+  }
+  if (input.featuredDishes) {
+    const dishes = normalizeDishList(input.featuredDishes.map((d) => ({ key: d, custom: d })));
+    await tx.experienceDish.deleteMany({ where: { experienceId } });
+    if (dishes.length) {
+      await tx.experienceDish.createMany({ data: dishes.map((d, i) => ({ experienceId, dishKey: d.dishKey, customName: d.customName, isCustom: d.isCustom, sortOrder: i })) });
+    }
+  }
+}
+
 export async function duplicateEvent(db: Db, hostId: string, experienceId: string, now: Date) {
   await assertOwnsExperience(db, hostId, experienceId);
-  const src = await db.experience.findUniqueOrThrow({ where: { id: experienceId }, include: { photos: true } });
-  const { id: _id, slug: _slug, createdAt: _c, updatedAt: _u, publishedAt: _p, status: _s, featured: _f, ...rest } = src;
-  void _id; void _slug; void _c; void _u; void _p; void _s; void _f;
+  const src = await db.experience.findUniqueOrThrow({
+    where: { id: experienceId },
+    include: { photos: true, featuredDishes: true, itinerary: true, menuSections: { include: { items: true } } },
+  });
+  const { id: _id, slug: _slug, createdAt: _c, updatedAt: _u, publishedAt: _p, status: _s, featured: _f, photos: _ph, featuredDishes: _fd, itinerary: _it, menuSections: _ms, ...rest } = src;
+  void _id; void _slug; void _c; void _u; void _p; void _s; void _f; void _ph; void _fd; void _it; void _ms;
   return db.experience.create({
     data: {
       ...rest,
-      photos: undefined,
+      saveCount: 0,
       title: `${src.title} (copy)`,
       slug: await uniqueSlug(db, `${src.title} copy`),
       status: "DRAFT",
@@ -225,6 +288,25 @@ export async function duplicateEvent(db: Db, hostId: string, experienceId: strin
   }).then(async (copy) => {
     if (src.photos.length) {
       await db.experiencePhoto.createMany({ data: src.photos.map((p) => ({ experienceId: copy.id, url: p.url, alt: p.alt, credit: p.credit, sortOrder: p.sortOrder })) });
+    }
+    if (src.featuredDishes.length) {
+      await db.experienceDish.createMany({ data: src.featuredDishes.map((d) => ({ experienceId: copy.id, dishKey: d.dishKey, customName: d.customName, isCustom: d.isCustom, sortOrder: d.sortOrder })) });
+    }
+    if (src.itinerary.length) {
+      await db.experienceItineraryStep.createMany({
+        data: src.itinerary.map((s) => ({ experienceId: copy.id, sortOrder: s.sortOrder, startOffsetMinutes: s.startOffsetMinutes, durationMinutes: s.durationMinutes, title: s.title, description: s.description })),
+      });
+    }
+    for (const section of src.menuSections) {
+      await db.experienceMenuSection.create({
+        data: {
+          experienceId: copy.id,
+          title: section.title,
+          description: section.description,
+          sortOrder: section.sortOrder,
+          items: { create: section.items.map(({ id: _i, sectionId: _s2, ...item }) => (void _i, void _s2, item)) },
+        },
+      });
     }
     return copy;
   });

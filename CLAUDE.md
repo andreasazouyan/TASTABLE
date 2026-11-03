@@ -87,6 +87,22 @@ tests/e2e            Playwright journeys against a production build and prisma/e
 - **Venues**: never claim Tastable secured a venue. "Venue to be confirmed" events stay drafts.
 - **Analytics** are derived from rows at request time, labelled as simulated, and insights only fire
   above minimum sample sizes. No invented confidence or market claims.
+- **Guest preferences**: one `GuestPreferences` row per guest, written only through
+  `saveGuestPreferences` (`src/server/services/preferences.ts`): partial patches, server-side Zod
+  validation, dishes normalized via `src/lib/domain/dishes.ts`. Vocabulary (days, two-hour time
+  slots with overlap matching, travel minutes, SOLO/FRIENDS_OR_PARTNER/DEPENDS) lives in
+  `src/lib/domain/preferences.ts`. Travel time is never converted to or from distance.
+- **Host audience insights** (`src/server/queries/audience-insights.ts`) aggregate in SQL and
+  apply `src/lib/analytics/privacy.ts` thresholds (segment >= 10, bucket >= 5). Never return
+  per-guest rows or identities to hosts.
+- **Saves**: `Experience.saveCount` = unique savers, changed only via `src/server/services/saved.ts`.
+- **Reviews**: one per booking/session, verified by a checked-in ticket, relationships derived from
+  the booking (`src/server/services/reviews.ts`). One rating calculation: `ratingSummary` in
+  `src/lib/reviews.ts`. Reports never hide a review automatically.
+- **Event content**: structured menu sections, itinerary (minutes from start) and featured dishes;
+  the legacy `Experience.menu` JSON is kept in sync by `saveEvent`.
+- **Migrations are additive only** (no drops/renames/deletes, no invented backfills). Run
+  `npm run db:check` for read-only integrity checks.
 - Money is stored in integer cents. Platform fee 10% of net ticket revenue; guest service fee 6% capped at $25.
 
 ## Demo data rules

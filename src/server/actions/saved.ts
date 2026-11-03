@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth/demo";
+import { serverNow } from "@/lib/clock";
 import { db } from "@/lib/db";
+import { toggleSavedExperience } from "@/server/services/saved";
 
 const schema = z.object({
   experienceId: z.string().min(1),
@@ -17,10 +19,7 @@ export async function toggleSaved(formData: FormData) {
   const user = await getCurrentUser();
   if (!user?.guestProfile) redirect(`/sign-in?next=${encodeURIComponent(path)}`);
 
-  const key = { guestId_experienceId: { guestId: user.guestProfile.id, experienceId } };
-  const existing = await db.savedExperience.findUnique({ where: key });
-  if (existing) await db.savedExperience.delete({ where: key });
-  else await db.savedExperience.create({ data: { guestId: user.guestProfile.id, experienceId } });
+  await toggleSavedExperience(db, { guestId: user.guestProfile.id, experienceId }, serverNow());
 
   revalidatePath("/saved");
   revalidatePath("/calendar");
