@@ -3,7 +3,7 @@ import { z } from "zod";
 import { CATEGORY_IDS } from "@/lib/domain/categories";
 import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
 import { MAX_CUSTOM_DISH_LENGTH, MAX_FAVORITE_DISHES } from "@/lib/domain/dishes";
-import { ATTENDANCE_IDS, DAY_KEYS, MAX_PREFERRED_CATEGORIES, TIME_SLOT_KEYS } from "@/lib/domain/preferences";
+import { ATTENDANCE_IDS, DAY_KEYS, MAX_PREFERRED_CATEGORIES, OPEN_TO_EVERYTHING, PREFERENCE_CUISINE_KEYS, TIME_SLOT_KEYS } from "@/lib/domain/preferences";
 import { CUISINE_KEYS, MOTIVATION_KEYS } from "@/lib/domain/taxonomy";
 
 const locationKeys = ["nyc", ...NEIGHBORHOODS.map((n) => n.key)] as [string, ...string[]];
@@ -52,7 +52,10 @@ export const guestPreferencesPatch = z
     preferredTimes: z.array(z.enum(TIME_SLOT_KEYS)).max(TIME_SLOT_KEYS.length),
     attendancePreference: z.enum(ATTENDANCE_IDS).nullable(),
     categories: z.array(z.enum(CATEGORY_IDS)).max(MAX_PREFERRED_CATEGORIES, `Choose up to ${MAX_PREFERRED_CATEGORIES} experience types`),
-    cuisines: z.array(z.enum(CUISINE_KEYS)).max(CUISINE_KEYS.length),
+    cuisines: z
+      .array(z.enum(PREFERENCE_CUISINE_KEYS))
+      .max(PREFERENCE_CUISINE_KEYS.length)
+      .refine((c) => !c.includes(OPEN_TO_EVERYTHING) || c.length === 1, "“Open to everything” can't be combined with specific cuisines"),
     /** Catalog keys ({ key }) or custom text ({ custom }), normalized by the service. */
     favoriteDishes: z
       .array(z.union([z.object({ key: z.string().trim().min(1).max(80) }), z.object({ custom: z.string().trim().min(1).max(MAX_CUSTOM_DISH_LENGTH) })]))

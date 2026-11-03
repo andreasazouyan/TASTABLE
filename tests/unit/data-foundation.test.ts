@@ -138,3 +138,13 @@ describe("structured event content", () => {
     expect(itineraryProblems([step(0, 240)], 180)).toHaveLength(1);
   });
 });
+
+describe("onboarding cuisine choices", () => {
+  it("keeps 'Open to everything' exclusive", async () => {
+    const { toggleCuisine, OPEN_TO_EVERYTHING } = await import("@/lib/domain/preferences");
+    expect(toggleCuisine(["italian", "thai"], OPEN_TO_EVERYTHING, true)).toEqual([OPEN_TO_EVERYTHING]);
+    expect(toggleCuisine([OPEN_TO_EVERYTHING], "thai", true)).toEqual(["thai"]);
+    expect(guestPreferencesPatch.safeParse({ cuisines: ["any", "thai"] }).success).toBe(false);
+    expect(guestPreferencesPatch.safeParse({ cuisines: ["chinese", "vietnamese", "mediterranean"] }).success).toBe(true);
+  });
+});

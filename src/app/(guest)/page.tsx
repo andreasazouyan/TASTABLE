@@ -115,7 +115,7 @@ async function RecommendedForYou() {
                 Get recommendations that explain themselves
               </h2>
               <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                Tell us where you are, what you like to eat and why you go out. Five quick steps, all optional.
+                Tell us where you are, when you like to go out and what you love to eat. Six quick steps, and you can skip any time.
               </p>
             </div>
           </div>

@@ -127,3 +127,43 @@ export function onboardingStatus(p: StatusInput | null | undefined): OnboardingS
     p.maxTravelMinutes != null;
   return answered ? "IN_PROGRESS" : "NOT_STARTED";
 }
+
+/**
+ * Cuisine options shown in onboarding and profile editing, in display order. Keys are the shared
+ * cuisine keys; OPEN_TO_EVERYTHING is a preference-only value (no event has it) meaning
+ * "any cuisine". Selecting it clears the others and vice versa.
+ */
+export const OPEN_TO_EVERYTHING = "any";
+export const PREFERENCE_CUISINES = [
+  { key: "italian", label: "Italian" },
+  { key: "japanese", label: "Japanese" },
+  { key: "indian", label: "Indian" },
+  { key: "french", label: "French" },
+  { key: "korean", label: "Korean" },
+  { key: "chinese", label: "Chinese" },
+  { key: "mexican", label: "Mexican" },
+  { key: "thai", label: "Thai" },
+  { key: "middle-eastern", label: "Middle Eastern" },
+  { key: "mediterranean", label: "Mediterranean" },
+  { key: "new-american", label: "American" },
+  { key: "vietnamese", label: "Vietnamese" },
+  { key: "caribbean", label: "Caribbean" },
+  { key: "west-african", label: "West African" },
+  { key: "plant-based", label: "Plant-based" },
+  { key: OPEN_TO_EVERYTHING, label: "Open to everything" },
+] as const;
+export const PREFERENCE_CUISINE_KEYS = PREFERENCE_CUISINES.map((c) => c.key) as [string, ...string[]];
+
+export function preferenceCuisineLabel(key: string) {
+  return PREFERENCE_CUISINES.find((c) => c.key === key)?.label;
+}
+
+/** Applies the "Open to everything" exclusivity rule to a toggled selection. */
+export function toggleCuisine(current: readonly string[], key: string, on: boolean): string[] {
+  if (!on) return current.filter((k) => k !== key);
+  if (key === OPEN_TO_EVERYTHING) return [OPEN_TO_EVERYTHING];
+  return [...current.filter((k) => k !== OPEN_TO_EVERYTHING && k !== key), key];
+}
+
+/** Dish suggestions shown first in onboarding (the rest of the catalog is searchable). */
+export const SUGGESTED_DISHES = ["pizza", "pasta", "sushi", "ramen", "dumplings", "tacos", "curry", "steak", "ice-cream", "pastries", "tiramisu", "dim-sum", "pho", "pad-thai", "korean-bbq", "croissant"] as const;

@@ -7,7 +7,9 @@ import { getCurrentUser } from "@/lib/auth/demo";
 import { serverNow } from "@/lib/clock";
 import { db } from "@/lib/db";
 import { serializeList } from "@/lib/domain/lists";
-import { preferencesFromFormData } from "@/lib/validation/preferences";
+import { preferencesFromFormData, type GuestPreferencesPatch } from "@/lib/validation/preferences";
+import { DomainError } from "@/server/services/errors";
+import { saveGuestPreferences } from "@/server/services/preferences";
 
 export type PrefsState = { ok: boolean; message: string } | null;
 
@@ -59,4 +61,34 @@ export async function skipOnboarding() {
 
 export async function updatePreferences(_prev: PrefsState, fd: FormData): Promise<PrefsState> {
   return persist(await guestId(), fd, "complete");
+}
+
+// ─── Onboarding v2 (six pages) and profile editing: typed patches through the preferences service ──
+
+export type SaveAnswersResult = { ok: true } | { ok: false; message: string };
+
+async function savePatch(patch: GuestPreferencesPatch, complete: boolean): Promise<SaveAnswersResult> {
+  const id = await guestId();
+  try {
+    await saveGuestPreferences(db, id, patch, serverNow(), { complete });
+  } catch (e) {
+    if (e instanceof DomainError) return { ok: false, message: e.message };
+    throw e;
+  }
+  revalidatePath("/");
+  revalidatePath("/profile");
+  revalidatePath("/profile/preferences");
+  return { ok: true };
+}
+
+/** Saves one onboarding page's answers (only the fields it sends). */
+export async function saveOnboardingAnswers(patch: GuestPreferencesPatch): Promise<SaveAnswersResult> {
+  return savePatch(patch, false);
+}
+
+/** Saves the last page and marks onboarding complete, then shows recommendations. */
+export async function finishOnboarding(patch: GuestPreferencesPatch): Promise<SaveAnswersResult> {
+  const result = await savePatch(patch, true);
+  if (result.ok) redirect("/?welcome=1");
+  return result;
 }

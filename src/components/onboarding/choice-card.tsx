@@ -13,6 +13,7 @@ export function ChoiceCard({
   hint,
   icon,
   className,
+  disabled = false,
 }: {
   type: "checkbox" | "radio";
   name: string;
@@ -23,16 +24,18 @@ export function ChoiceCard({
   hint?: string;
   icon?: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   return (
     <label
       className={cn(
         "relative flex cursor-pointer flex-col gap-1 rounded-2xl border bg-card p-4 text-left transition-[border-color,box-shadow,background-color,transform] duration-200 ease-soft has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/40 hover:-translate-y-px hover:shadow-soft",
         checked ? "border-foreground bg-card shadow-soft" : "border-border",
+        disabled && !checked && "cursor-not-allowed opacity-50 hover:translate-y-0 hover:shadow-none",
         className,
       )}
     >
-      <input type={type} name={name} value={value} checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only" />
+      <input type={type} name={name} value={value} checked={checked} onChange={(e) => onChange(e.target.checked)} disabled={disabled && !checked} className="sr-only" />
       <span
         aria-hidden
         className={cn(
