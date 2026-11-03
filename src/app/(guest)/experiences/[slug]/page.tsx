@@ -4,7 +4,10 @@ import { Suspense } from "react";
 import { BadgeCheck, CalendarClock, Check, Clock, KeyRound, Leaf, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 
 import { FollowButton } from "@/components/experiences/follow-button";
+import { EventMenu, menuHeading, type MenuView } from "@/components/experiences/event-menu";
+import { ExperienceTimeline } from "@/components/experiences/experience-timeline";
 import { HostRating } from "@/components/experiences/host-rating";
+import { sectionsFromLegacyMenu } from "@/lib/domain/event-content";
 import { SaveButton } from "@/components/experiences/save-button";
 import { getHostRating } from "@/server/queries/reviews";
 import { SessionPicker, type PickerSession } from "@/components/experiences/session-picker";
@@ -63,7 +66,12 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
 
   const category = getCategory(exp.category);
   const highlights = parseJson(exp.highlights, stringItem);
-  const menu = parseJson(exp.menu, menuItemSchema);
+  const menuView: MenuView = {
+    status: exp.menuStatus,
+    sections: exp.menuSections.length
+      ? exp.menuSections.map((sec) => ({ title: sec.title, description: sec.description, items: sec.items.map((it) => ({ ...it, dietaryTags: parseList(it.dietaryTags) })) }))
+      : sectionsFromLegacyMenu(parseJson(exp.menu, menuItemSchema)),
+  };
   const inclusions = parseJson(exp.inclusions, stringItem);
   const dietary = parseList(exp.dietaryOptions);
   const occasions = parseList(exp.occasions);
@@ -81,6 +89,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
   const fromPrice = Math.min(exp.ticketPriceCents, ...upcoming.map((s) => sessionUnitPrice(s, exp)));
   const atmosphere = ATMOSPHERES[exp.socialAtmosphere];
   const sessionParam = typeof sp.session === "string" ? sp.session : undefined;
+  const timelineSession = upcoming.find((x) => x.id === sessionParam && x.status !== "CANCELLED") ?? upcoming.find((x) => x.status !== "CANCELLED");
   const path = `/experiences/${exp.slug}`;
   const photos = exp.photos.length ? exp.photos : [{ id: "none", url: "", alt: exp.title }];
 
@@ -140,7 +149,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
           />
         ))}
       </div>
-      {photos.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Placeholder photography (Unsplash). Photos do not depict this fictional host or event.</p>}
+      {photos.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Illustrative photography. Photos do not depict this fictional host or event.</p>}
 
       <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_24rem]">
         <div>
@@ -156,19 +165,15 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
             <p className="mt-6 text-[15px] leading-relaxed text-foreground/85">{exp.description}</p>
           </Section>
 
-          <Section title={exp.format === "HANDS_ON_CLASS" || exp.format === "DEMONSTRATION" ? "What you'll do" : "Menu"} id="menu">
-            <ol className="space-y-4">
-              {menu.map((m, i) => (
-                <li key={m.title + i} className="flex gap-4">
-                  <span className="font-display text-lg text-brand tabular-nums">{String(i + 1).padStart(2, "0")}</span>
-                  <span>
-                    <span className="block font-medium">{m.title}</span>
-                    {m.description && <span className="text-sm text-muted-foreground">{m.description}</span>}
-                  </span>
-                </li>
-              ))}
-            </ol>
+          <Section title={menuHeading(exp.category)} id="menu">
+            <EventMenu menu={menuView} />
           </Section>
+
+          {exp.itinerary.length > 0 && (
+            <Section title="Your Experience" id="itinerary">
+              <ExperienceTimeline steps={exp.itinerary} startsAt={timelineSession?.startsAt ?? null} />
+            </Section>
+          )}
 
           <Section title="What's included" id="included">
             <ul className="grid gap-2 sm:grid-cols-2">

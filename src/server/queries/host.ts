@@ -1,5 +1,7 @@
 import "server-only";
 
+import { dishLabel } from "@/lib/domain/dishes";
+import { sectionsFromLegacyMenu } from "@/lib/domain/event-content";
 import { addDays, nyDateTime } from "@/lib/clock";
 import { db } from "@/lib/db";
 import { parseJson, parseList, menuItemSchema, stringItem } from "@/lib/domain/lists";
@@ -69,9 +71,13 @@ export async function getEventForEdit(hostId: string, id: string) {
       venue: true,
       cancellationPolicy: true,
       sessions: { orderBy: { startsAt: "asc" } },
+      menuSections: { orderBy: { sortOrder: "asc" }, include: { items: { orderBy: { sortOrder: "asc" } } } },
+      itinerary: { orderBy: { sortOrder: "asc" } },
+      featuredDishes: { orderBy: { sortOrder: "asc" } },
     },
   });
   if (!e || e.hostId !== hostId) return null;
+  const legacyMenu = parseJson(e.menu, menuItemSchema);
   const value: EventInput = {
     title: e.title,
     summary: e.summary,
@@ -94,7 +100,28 @@ export async function getEventForEdit(hostId: string, id: string) {
     ticketPriceDollars: e.ticketPriceCents / 100,
     durationMinutes: e.durationMinutes,
     highlights: parseJson(e.highlights, stringItem),
-    menu: parseJson(e.menu, menuItemSchema),
+    menu: legacyMenu,
+    menuSections: e.menuSections.length
+      ? e.menuSections.map((sec) => ({
+          title: sec.title,
+          description: sec.description,
+          items: sec.items.map((it) => ({
+            name: it.name,
+            description: it.description,
+            dietaryTags: parseList(it.dietaryTags),
+            ...(it.dishKey ? { dish: dishLabel(it.dishKey) } : {}),
+            ...(it.imageUrl ? { imageUrl: it.imageUrl, imageAlt: it.imageAlt ?? "" } : {}),
+          })),
+        }))
+      : sectionsFromLegacyMenu(legacyMenu),
+    menuStatus: e.menuStatus,
+    itinerary: e.itinerary.map((st) => ({
+      startOffsetMinutes: st.startOffsetMinutes,
+      endOffsetMinutes: st.durationMinutes === null ? null : st.startOffsetMinutes + st.durationMinutes,
+      title: st.title,
+      description: st.description,
+    })),
+    featuredDishes: e.featuredDishes.map((d) => dishLabel(d.dishKey, d.customName)),
     inclusions: parseJson(e.inclusions, stringItem),
     dietaryOptions: parseList(e.dietaryOptions),
     policy: { mode: "template", templateId: e.cancellationPolicyId },

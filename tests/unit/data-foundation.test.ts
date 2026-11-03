@@ -148,3 +148,30 @@ describe("onboarding cuisine choices", () => {
     expect(guestPreferencesPatch.safeParse({ cuisines: ["chinese", "vietnamese", "mediterranean"] }).success).toBe(true);
   });
 });
+
+describe("seeded event content", () => {
+  it("gives every sample event a distinct cover photo and distinct photo set", async () => {
+    const { EXPERIENCES } = await import("../../prisma/seed-data");
+    const { PHOTOS } = await import("@/lib/domain/photos");
+    const covers = EXPERIENCES.map((e) => e.photos[0]);
+    expect(new Set(covers).size).toBe(EXPERIENCES.length);
+    expect(new Set(EXPERIENCES.map((e) => e.photos.join("|"))).size).toBe(EXPERIENCES.length);
+    for (const e of EXPERIENCES) {
+      expect(new Set(e.photos).size).toBe(e.photos.length);
+      for (const k of e.photos) expect(PHOTOS[k]).toBeDefined();
+    }
+    expect(new Set(Object.values(PHOTOS).map((p) => p.src)).size).toBe(Object.keys(PHOTOS).length);
+  });
+
+  it("has a structured menu for every sample event that passes host validation", async () => {
+    const { EXPERIENCES } = await import("../../prisma/seed-data");
+    const { SEED_MENUS } = await import("../../prisma/seed-menus");
+    const { menuSectionsInput } = await import("@/lib/domain/event-content");
+    for (const e of EXPERIENCES) {
+      const menu = SEED_MENUS[e.slug];
+      expect(menu, e.slug).toBeDefined();
+      const parsed = menuSectionsInput.safeParse(menu.sections.map((s) => ({ title: s.title, description: s.description ?? "", items: s.items.map((i) => ({ name: i.name, description: i.description ?? "", dietaryTags: i.dietary ?? [], dish: i.dish })) })));
+      expect(parsed.success, e.slug).toBe(true);
+    }
+  });
+});

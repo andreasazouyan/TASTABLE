@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MIN_BUCKET_SIZE } from "@/lib/analytics/privacy";
+import { legacyMenuFromSections } from "@/lib/domain/event-content";
 import { serverNow } from "@/lib/clock";
 import { db } from "@/lib/db";
 import { getAudienceInsights, getEventCreationContext } from "@/server/queries/audience-insights";
@@ -18,10 +19,18 @@ describe("seeded foundation data", () => {
   it("backfills structured content, policy versions and save counters", async () => {
     const pasta = await db.experience.findUniqueOrThrow({
       where: { slug: "italian-pasta-making-workshop" },
-      include: { featuredDishes: true, itinerary: { orderBy: { sortOrder: "asc" } }, menuSections: { include: { items: true } }, _count: { select: { saved: true } } },
+      include: {
+        featuredDishes: true,
+        itinerary: { orderBy: { sortOrder: "asc" } },
+        menuSections: { orderBy: { sortOrder: "asc" }, include: { items: { orderBy: { sortOrder: "asc" } } } },
+        _count: { select: { saved: true } },
+      },
     });
     expect(pasta.featuredDishes.map((d) => d.dishKey)).toContain("pasta");
-    expect(pasta.menuSections[0].items.length).toBe(JSON.parse(pasta.menu).length);
+    // The legacy flat menu is derived from the structured sections (same rule as saveEvent).
+    const sections = pasta.menuSections.map((sec) => ({ title: sec.title, description: sec.description, items: sec.items.map((i) => ({ name: i.name, description: i.description, dietaryTags: [] })) }));
+    expect(JSON.parse(pasta.menu)).toEqual(legacyMenuFromSections(sections));
+    expect(pasta.menuSections.length).toBeGreaterThan(1);
     expect(pasta.itinerary[0].startOffsetMinutes).toBe(0);
     expect(pasta.saveCount).toBe(pasta._count.saved);
     expect(await db.booking.count({ where: { cancellationPolicyVersion: null } })).toBe(0);

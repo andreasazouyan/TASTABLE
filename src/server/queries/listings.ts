@@ -112,6 +112,8 @@ export async function getExperienceDetail(slug: string) {
       cancellationPolicy: true,
       photos: { orderBy: { sortOrder: "asc" } },
       sessions: { where: { status: { in: ["SCHEDULED", "CANCELLED"] } }, orderBy: { startsAt: "asc" } },
+      menuSections: { orderBy: { sortOrder: "asc" }, include: { items: { orderBy: { sortOrder: "asc" } } } },
+      itinerary: { orderBy: { sortOrder: "asc" } },
       _count: { select: { saved: true } },
     },
   });

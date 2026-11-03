@@ -64,8 +64,11 @@ test("Recommended for You explains itself and discovery stays complete", async (
 
   // Personal ordering never hides listings.
   await page.goto("/discover");
-  const personal = await page.getByRole("list", { name: "Results" }).getByRole("listitem").count();
+  const results = page.getByRole("list", { name: "Results" }).getByRole("article");
+  await expect(results.first()).toBeVisible();
+  const personal = await results.count();
   await expect(page.getByText(/using your preferences to order results \(nothing is hidden\)/)).toBeVisible();
   await page.goto("/discover?sort=soonest");
-  expect(await page.getByRole("list", { name: "Results" }).getByRole("listitem").count()).toBe(personal);
+  await expect(results.first()).toBeVisible();
+  await expect(results).toHaveCount(personal);
 });

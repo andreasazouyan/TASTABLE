@@ -4,11 +4,16 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, ImagePlus, Plus, Trash2 } from "lucide-react";
 
+import { EventMenu, menuHeading } from "@/components/experiences/event-menu";
+import { ExperienceTimeline } from "@/components/experiences/experience-timeline";
+import { FeaturedDishesEditor, ItineraryEditor, MenuSectionsEditor, MenuStatusField, menuProblems } from "@/components/host/event-content-editors";
 import { Field, inputClass } from "@/components/host/field";
 import { ChoiceCard } from "@/components/onboarding/choice-card";
 import { Photo } from "@/components/site/photo";
 import { Button } from "@/components/ui/button";
+import { nyDateTime } from "@/lib/clock";
 import { CATEGORIES } from "@/lib/domain/categories";
+import { itineraryProblems, legacyMenuFromSections, sectionsFromLegacyMenu, stepDuration } from "@/lib/domain/event-content";
 import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
 import { PHOTOS } from "@/lib/domain/photos";
 import { ATMOSPHERES, CUISINES, DIETARY_OPTIONS, FORMATS, OCCASIONS } from "@/lib/domain/taxonomy";
@@ -31,7 +36,8 @@ const VENUE_TYPES: Record<string, string> = {
   SECRET_LOCATION: "Secret location",
 };
 
-const STEPS = ["Basics", "Category", "Photos", "Venue", "Dates & price", "Menu", "Policy", "Review"] as const;
+const STEPS = ["Basics", "Category", "Photos", "Venue", "Dates & price", "Menu", "Itinerary", "Policy", "Review"] as const;
+const REVIEW = STEPS.length - 1;
 
 type NewVenue = { name: string; type: string; neighborhood: string; addressLine: string; maxCapacity: number; isSecretLocation: boolean };
 type Custom = { fullRefundHours: number; partialRefundHours: number | null; partialRefundPercent: number };
@@ -55,7 +61,13 @@ export function EventWizard({
 }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [v, setV] = useState<EventInput>(initial);
+  const [v, setV] = useState<EventInput>(() => ({
+    ...initial,
+    menuSections: initial.menuSections ?? sectionsFromLegacyMenu(initial.menu),
+    menuStatus: initial.menuStatus ?? "FINAL",
+    itinerary: initial.itinerary ?? [],
+    featuredDishes: initial.featuredDishes ?? [],
+  }));
   const [tagText, setTagText] = useState(initial.tags.join(", "));
   const [hasVenue, setHasVenue] = useState<boolean>(initial.venue.mode !== "tbc");
   const [venueMode, setVenueMode] = useState<"existing" | "new">(initial.venue.mode === "new" || !venues.length ? "new" : "existing");
@@ -81,7 +93,8 @@ export function EventWizard({
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean)
       .slice(0, 8);
-    return { ...v, tags, venue, policy };
+    const menuSections = v.menuSections ?? [];
+    return { ...v, menu: legacyMenuFromSections(menuSections), tags, venue, policy };
   }, [v, tagText, hasVenue, venueMode, venueId, newVenue, policyMode, templateId, custom]);
 
   const stepProblems = problemsFor(step, payload);
@@ -89,8 +102,14 @@ export function EventWizard({
     ...(payload.venue.mode === "tbc" ? ["A confirmed venue (venue requests don't secure one)"] : []),
     ...(payload.sessions.some((s) => s.date >= today) ? [] : ["At least one future date"]),
     ...(payload.photos.length ? [] : ["At least one photo"]),
-    ...(payload.menu.length ? [] : ["The menu or activities"]),
+    ...(payload.menu.length || payload.menuStatus === "TO_BE_ANNOUNCED" ? [] : ["The menu or activities (or mark the menu as to be announced)"]),
+    ...menuProblems(payload.menuSections ?? []),
+    ...itineraryStepProblems(payload),
   ];
+  const previewStart = payload.sessions
+    .filter((s) => s.date >= today)
+    .map((s) => nyDateTime(s.date, ...(s.time.split(":").map(Number) as [number, number])))
+    .sort((a, b) => a.getTime() - b.getTime())[0];
 
   function submit(intent: "draft" | "publish") {
     setMessage(null);
@@ -344,7 +363,9 @@ export function EventWizard({
 
           {step === 5 && (
             <div className="space-y-8">
-              <MenuEditor items={v.menu} onChange={(m) => set("menu", m)} />
+              <MenuStatusField value={v.menuStatus ?? "FINAL"} onChange={(st) => set("menuStatus", st)} />
+              <MenuSectionsEditor sections={v.menuSections ?? []} category={v.category} onChange={(m) => set("menuSections", m)} />
+              <FeaturedDishesEditor dishes={v.featuredDishes ?? []} onChange={(d) => set("featuredDishes", d)} />
               <ListEditor label="What's included" placeholder="e.g. Natural wine pairing" items={v.inclusions} max={10} onChange={(x) => set("inclusions", x)} />
               <fieldset>
                 <legend className="mb-3 font-medium">Dietary options you can accommodate</legend>
@@ -357,7 +378,9 @@ export function EventWizard({
             </div>
           )}
 
-          {step === 6 && (
+          {step === 6 && <ItineraryEditor steps={v.itinerary ?? []} durationMinutes={v.durationMinutes} onChange={(st) => set("itinerary", st)} />}
+
+          {step === 7 && (
             <div className="space-y-5">
               <p className="text-sm text-muted-foreground">These terms apply to every booking for this event. Guests see them before paying and see the exact refund before cancelling.</p>
               <div className="flex gap-2">
@@ -399,7 +422,7 @@ export function EventWizard({
             </div>
           )}
 
-          {step === 7 && (
+          {step === REVIEW && (
             <div className="space-y-6">
               <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                 <Summary label="Title" value={payload.title || "—"} />
@@ -409,8 +432,22 @@ export function EventWizard({
                 <Summary label="Dates" value={`${payload.sessions.length} date(s)`} />
                 <Summary label="Photos" value={`${payload.photos.length}`} />
                 <Summary label="Venue" value={payload.venue.mode === "tbc" ? "To be confirmed" : payload.venue.mode === "new" ? `New: ${newVenue.name || "unnamed"}` : (venues.find((x) => x.id === venueId)?.name ?? "—")} />
-                <Summary label="Menu items" value={`${payload.menu.length}`} />
+                <Summary label="Menu" value={payload.menuStatus === "TO_BE_ANNOUNCED" ? "To be announced" : `${payload.menu.length} item(s)${payload.menuStatus === "SUBJECT_TO_CHANGE" ? ", subject to change" : ""}`} />
+                <Summary label="Itinerary" value={`${payload.itinerary?.length ?? 0} step(s)`} />
               </dl>
+              <section aria-labelledby="preview-heading" className="rounded-2xl border bg-background p-5">
+                <p className="eyebrow">Preview</p>
+                <h3 id="preview-heading" className="mb-1 text-xl">How guests will see it</h3>
+                <p className="mb-5 text-sm text-muted-foreground">Nothing is published until you choose Publish.</p>
+                <h4 className="mb-3 font-display text-lg">{menuHeading(payload.category)}</h4>
+                <EventMenu menu={{ status: payload.menuStatus ?? "FINAL", sections: payload.menuSections ?? [] }} />
+                {(payload.itinerary?.length ?? 0) > 0 && (
+                  <>
+                    <h4 className="mt-8 mb-3 font-display text-lg">Your Experience</h4>
+                    <ExperienceTimeline steps={(payload.itinerary ?? []).map((st) => ({ ...st, durationMinutes: stepDuration(st) }))} startsAt={previewStart ?? null} />
+                  </>
+                )}
+              </section>
               {publishBlockers.length > 0 ? (
                 <div className="rounded-xl border border-dashed bg-muted/40 p-4 text-sm">
                   <p className="flex items-center gap-2 font-medium">
@@ -429,7 +466,7 @@ export function EventWizard({
             </div>
           )}
 
-          {stepProblems.length > 0 && step < 7 && (
+          {stepProblems.length > 0 && step < REVIEW && (
             <ul className="mt-6 space-y-1 text-sm text-muted-foreground">
               {stepProblems.map((p) => (
                 <li key={p} className="flex items-center gap-2">
@@ -483,7 +520,18 @@ function problemsFor(step: number, v: EventInput): string[] {
     if (!v.sessions.length) p.push("Add at least one date.");
     if (v.ticketPriceDollars < 5) p.push("Minimum ticket price is $5.");
   }
+  if (step === 5) p.push(...menuProblems(v.menuSections ?? []));
+  if (step === 6) p.push(...itineraryStepProblems(v));
   return p;
+}
+
+function itineraryStepProblems(v: EventInput) {
+  const steps = v.itinerary ?? [];
+  const p = steps.flatMap((st, i) => [
+    ...(st.title.trim() ? [] : [`Give step ${i + 1} a title.`]),
+    ...(st.endOffsetMinutes !== null && st.endOffsetMinutes <= st.startOffsetMinutes ? [`Step ${i + 1} must end after it starts.`] : []),
+  ]);
+  return [...p, ...itineraryProblems(steps, v.durationMinutes)];
 }
 
 function Summary({ label, value }: { label: string; value: string }) {
@@ -554,28 +602,6 @@ function ListEditor({ label, placeholder, items, max, onChange }: { label: strin
           Add
         </Button>
       </div>
-    </div>
-  );
-}
-
-function MenuEditor({ items, onChange }: { items: EventInput["menu"]; onChange: (m: EventInput["menu"]) => void }) {
-  return (
-    <div>
-      <h3 className="mb-2 font-medium">Menu or activities</h3>
-      <ul className="space-y-3">
-        {items.map((m, i) => (
-          <li key={i} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_2fr_auto]">
-            <input aria-label={`Course ${i + 1} title`} className={inputClass} value={m.title} placeholder="Course or activity" onChange={(e) => onChange(items.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} />
-            <input aria-label={`Course ${i + 1} description`} className={inputClass} value={m.description} placeholder="Short description" onChange={(e) => onChange(items.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)))} />
-            <Button type="button" variant="ghost" size="icon" aria-label={`Remove course ${i + 1}`} onClick={() => onChange(items.filter((_, j) => j !== i))}>
-              <Trash2 aria-hidden />
-            </Button>
-          </li>
-        ))}
-      </ul>
-      <Button type="button" variant="outline" size="sm" className="mt-3" disabled={items.length >= 15} onClick={() => onChange([...items, { title: "", description: "" }])}>
-        <Plus aria-hidden /> Add a course or activity
-      </Button>
     </div>
   );
 }
