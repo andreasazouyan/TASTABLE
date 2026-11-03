@@ -27,6 +27,7 @@ import { nyDateTime } from "@/lib/clock";
 import { requestNow } from "@/lib/request-clock";
 import { getSavedIds } from "@/server/queries/guest";
 import { getListings } from "@/server/queries/listings";
+import { personalizeResults } from "@/server/queries/recommendations";
 import { DiscoverSkeleton } from "./skeleton";
 
 export const metadata: Metadata = { title: "Discover" };
@@ -72,7 +73,12 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
   const now = await requestNow();
   const [listings, user] = await Promise.all([getListings(now.toISOString()), getCurrentUser()]);
   const saved = await getSavedIds(user?.guestProfile?.id);
-  const results = applyFilters(listings, filters, now);
+  const filtered = applyFilters(listings, filters, now);
+  // "Recommended" sort is personal for guests with preferences: same results, ordered by fit.
+  const prefs = user?.guestProfile?.preferences;
+  const personal = (filters.sort ?? "recommended") === "recommended" && prefs?.onboardingCompletedAt ? await personalizeResults(prefs, filtered) : null;
+  const results = personal ? personal.map((p) => p.listing) : filtered;
+  const reasons = new Map((personal ?? []).filter((p) => p.reason).map((p) => [p.listing.id, p.reason!]));
   const chips = chipsFor(filters);
   const count = activeFilterCount(filters);
   const collection = COLLECTIONS.find((c) => c.key === filters.collection);
@@ -146,13 +152,14 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
             <ul className="grid gap-x-5 gap-y-10 sm:grid-cols-2 xl:grid-cols-3" aria-label="Results">
               {results.map((l, i) => (
                 <li key={l.id}>
-                  <ExperienceCard listing={l} saved={saved.has(l.id)} priority={i < 3} />
+                  <ExperienceCard listing={l} saved={saved.has(l.id)} priority={i < 3} reason={reasons.get(l.id)} />
                 </li>
               ))}
             </ul>
           )}
           <p className="mt-10 text-xs text-muted-foreground">
-            Sorted by {SORTS.find((s) => s.key === (filters.sort ?? "recommended"))!.label.toLowerCase()}. All listings are fictional samples.
+            Sorted by {SORTS.find((s) => s.key === (filters.sort ?? "recommended"))!.label.toLowerCase()}
+            {personal ? ", using your preferences to order results (nothing is hidden)" : ""}. All listings are fictional samples.
           </p>
         </section>
       </div>

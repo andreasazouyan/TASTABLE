@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BadgeCheck, MapPin } from "lucide-react";
 
 import { AvailabilityPill } from "@/components/experiences/availability";
+import { HostRating } from "@/components/experiences/host-rating";
 import { SaveButton } from "@/components/experiences/save-button";
 import { Photo } from "@/components/site/photo";
 import { SampleBadge } from "@/components/site/sample-badge";
@@ -14,7 +15,7 @@ import type { ExperienceCategory } from "@/generated/prisma/enums";
 export type CardListing = Pick<
   ListingMatch,
   "id" | "slug" | "title" | "category" | "tags" | "host" | "venue" | "photo" | "coverTheme" | "isFictional" | "ticketPriceCents"
-> & { matched: ListingMatch["matched"]; matchedCount?: number; distance?: number | null };
+> & Partial<Pick<ListingMatch, "saves" | "hostRating">> & { matched: ListingMatch["matched"]; matchedCount?: number; distance?: number | null };
 
 /**
  * Event card: photo, title, host, date, neighborhood, price, available spots and tags.
@@ -54,7 +55,7 @@ export function ExperienceCard({
         <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">{listing.isFictional && <SampleBadge />}</div>
         </div>
-        <SaveButton experienceId={listing.id} saved={saved} title={listing.title} className="absolute top-3 right-3 z-10" />
+        <SaveButton experienceId={listing.id} saved={saved} saveCount={listing.saves ?? 0} title={listing.title} className="absolute top-3 right-3 z-10" />
         {session && (
           <AvailabilityPill seatsLeft={session.seatsLeft} availability={session.availability} className="absolute bottom-3 left-3" />
         )}
@@ -74,6 +75,7 @@ export function ExperienceCard({
           <span className="truncate">Hosted by {listing.host.displayName}</span>
           {listing.host.verified && <BadgeCheck className="size-3.5 shrink-0 text-brand" aria-label="Verified host" />}
         </p>
+        {listing.hostRating && <HostRating rating={listing.hostRating} className="mt-1" />}
 
         <dl className="mt-2.5 space-y-1 text-sm">
           <div className="flex items-center gap-1.5">

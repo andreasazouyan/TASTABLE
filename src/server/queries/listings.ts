@@ -7,6 +7,7 @@ import { sessionUnitPrice } from "@/lib/booking/pricing";
 import { db } from "@/lib/db";
 import { parseList } from "@/lib/domain/lists";
 import type { Listing } from "@/lib/discovery/types";
+import { getHostRatings } from "@/server/queries/reviews";
 
 const COVER_BY_CATEGORY: Record<string, string> = {
   SUPPER_CLUB_PRIVATE_DINING: "terracotta",
@@ -17,11 +18,11 @@ const COVER_BY_CATEGORY: Record<string, string> = {
 
 const listingInclude = (now: Date) =>
   ({
-    host: { select: { slug: true, displayName: true, hostType: true, verified: true, followerCount: true } },
+    host: { select: { id: true, slug: true, displayName: true, hostType: true, verified: true, followerCount: true } },
+    featuredDishes: { orderBy: { sortOrder: "asc" }, select: { dishKey: true } },
     venue: true,
     photos: { orderBy: { sortOrder: "asc" }, take: 1 },
     sessions: { where: { startsAt: { gt: now }, status: "SCHEDULED" }, orderBy: { startsAt: "asc" } },
-    _count: { select: { saved: true } },
   }) as const;
 
 type Row = Awaited<ReturnType<typeof loadRows>>[number];
@@ -34,7 +35,10 @@ async function loadRows(now: Date, where: object = {}) {
   });
 }
 
-export function toListing(row: Row, now: Date, views = 0): Listing {
+type Rating = Listing["hostRating"];
+const NO_RATING: Rating = { average: null, count: 0, isNew: true };
+
+export function toListing(row: Row, now: Date, views = 0, hostRating: Rating = NO_RATING): Listing {
   return {
     id: row.id,
     slug: row.slug,
@@ -53,6 +57,8 @@ export function toListing(row: Row, now: Date, views = 0): Listing {
     durationMinutes: row.durationMinutes,
     ticketPriceCents: row.ticketPriceCents,
     host: row.host,
+    hostRating,
+    dishes: row.featuredDishes.map((d) => d.dishKey),
     venue: {
       name: row.venue.name,
       type: row.venue.type,
@@ -73,7 +79,7 @@ export function toListing(row: Row, now: Date, views = 0): Listing {
       priceCents: sessionUnitPrice(s, row),
       availability: availability(s, now),
     })),
-    saves: row._count.saved,
+    saves: Math.max(0, row.saveCount),
     views,
   };
 }
@@ -87,12 +93,14 @@ export const getListings = cache(async (nowIso: string): Promise<Listing[]> => {
     db.experienceDailyStat.groupBy({ by: ["experienceId"], where: { date: { gte: since } }, _sum: { views: true } }),
   ]);
   const viewMap = new Map(views.map((v) => [v.experienceId, v._sum.views ?? 0]));
-  return rows.map((r) => toListing(r, now, viewMap.get(r.id) ?? 0));
+  const ratings = await getHostRatings(Array.from(new Set(rows.map((r) => r.hostId))));
+  return rows.map((r) => toListing(r, now, viewMap.get(r.id) ?? 0, ratings.get(r.hostId)));
 });
 
 export async function getListingsByIds(ids: string[], now: Date) {
   const rows = await loadRows(now, { id: { in: ids } });
-  return rows.map((r) => toListing(r, now));
+  const ratings = await getHostRatings(Array.from(new Set(rows.map((r) => r.hostId))));
+  return rows.map((r) => toListing(r, now, 0, ratings.get(r.hostId)));
 }
 
 export async function getExperienceDetail(slug: string) {

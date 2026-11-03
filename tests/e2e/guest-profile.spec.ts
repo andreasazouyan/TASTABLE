@@ -35,8 +35,13 @@ test("profile: edit neighborhood, time slots, cuisine and dish; changes persist 
   await expect(page.getByRole("button", { name: "Remove Pasta" })).toHaveCount(0);
 
   // Recommendations reflect the new cuisine and neighborhood.
+  // Pasta is no longer a reason anywhere; the taco pop-up now explains itself with the new answers.
   await page.goto("/");
-  await expect(page.getByText(/Mexican, a cuisine you love|from East Village/).first()).toBeVisible();
+  await expect(page.getByRole("region", { name: "Picked for you, Jordan" }).getByText(/^Why: /).first()).toBeVisible();
+  await expect(page.getByText(/favorite dishes: Pasta/)).toHaveCount(0);
+  await page.goto("/discover");
+  const taco = page.getByRole("article").filter({ has: page.getByRole("link", { name: "One-Night Taco Pop-Up" }) });
+  await expect(taco.getByText(/Featuring one of your favorite dishes: Tacos/)).toBeVisible();
 
   // Bookings and saved experiences are untouched.
   await page.goto("/profile");

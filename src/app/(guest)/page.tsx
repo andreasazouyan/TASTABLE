@@ -138,21 +138,21 @@ async function RecommendedForYou() {
         eyebrow="Recommended for you"
         title={`Picked for you, ${user.name.split(" ")[0]}`}
         description="Ranked by simple rules from your preferences. Each card says why it's here."
-        href="/profile/preferences"
+        href="/profile#preferences"
         linkLabel="Edit preferences"
       />
       {recs.length ? (
         <CardRow label="Recommended for you">
           {recs.map((r) => (
             <CardRowItem key={r.listing.id}>
-              <ExperienceCard listing={r.listing} saved={saved.has(r.listing.id)} reason={`Why: ${r.reasons.join(" · ")}`} />
+              <ExperienceCard listing={r.listing} saved={saved.has(r.listing.id)} reason={`Why: ${r.reasons.slice(0, 2).join(" · ")}`} />
             </CardRowItem>
           ))}
         </CardRow>
       ) : (
         <p className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-          Nothing matches all of your preferences right now. Try widening your travel radius in{" "}
-          <Link href="/profile/preferences" className="text-brand underline">
+          Nothing is bookable within your limits right now. Try adjusting your budget or travel answers in{" "}
+          <Link href="/profile#preferences" className="text-brand underline">
             your preferences
           </Link>
           .

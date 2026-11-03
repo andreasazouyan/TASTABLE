@@ -28,12 +28,17 @@ export type Listing = {
   publishedAt: Date | null;
   durationMinutes: number;
   ticketPriceCents: number;
-  host: { slug: string; displayName: string; hostType: string; verified: boolean; followerCount: number };
+  host: { id: string; slug: string; displayName: string; hostType: string; verified: boolean; followerCount: number };
+  /** Average of verified reviews (one shared calculation, src/lib/reviews.ts). */
+  hostRating: { average: number | null; count: number; isNew: boolean };
+  /** Featured dish keys. */
+  dishes: string[];
   venue: { name: string; type: string; neighborhood: string; borough: string; lat: number; lng: number; isSecret: boolean };
   photo: { url: string; alt: string } | null;
   coverTheme: string;
   /** Upcoming, non-cancelled sessions in date order. */
   sessions: ListingSession[];
+  /** Unique guests who saved this experience. */
   saves: number;
   views: number;
 };

@@ -21,6 +21,8 @@ export async function toggleSaved(formData: FormData) {
 
   await toggleSavedExperience(db, { guestId: user.guestProfile.id, experienceId }, serverNow());
 
+  revalidatePath(path.split("?")[0]);
+  revalidatePath("/");
   revalidatePath("/saved");
   revalidatePath("/calendar");
 }

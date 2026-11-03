@@ -4,7 +4,9 @@ import { Suspense } from "react";
 import { BadgeCheck, CalendarClock, Check, Clock, KeyRound, Leaf, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 
 import { FollowButton } from "@/components/experiences/follow-button";
+import { HostRating } from "@/components/experiences/host-rating";
 import { SaveButton } from "@/components/experiences/save-button";
+import { getHostRating } from "@/server/queries/reviews";
 import { SessionPicker, type PickerSession } from "@/components/experiences/session-picker";
 import { ShareButton } from "@/components/experiences/share-button";
 import { Photo } from "@/components/site/photo";
@@ -49,11 +51,12 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
   if (!exp) notFound();
 
   const guestId = user?.guestProfile?.id;
-  const [saved, waitlisted] = await Promise.all([
+  const [saved, waitlisted, hostRating] = await Promise.all([
     guestId ? db.savedExperience.findUnique({ where: { guestId_experienceId: { guestId, experienceId: exp.id } } }) : null,
     guestId
       ? db.waitlistEntry.findMany({ where: { guestId, status: { in: ["WAITING", "NOTIFIED"] }, session: { experienceId: exp.id } }, select: { sessionId: true } })
       : [],
+    getHostRating(exp.hostId),
   ]);
   const waitlistedIds = new Set(waitlisted.map((w) => w.sessionId));
   const following = (user?.guestProfile?.preferences?.followedHosts ?? "").split(",").includes(exp.host.slug);
@@ -118,7 +121,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <SaveButton experienceId={exp.id} saved={!!saved} title={exp.title} variant="inline" />
+          <SaveButton experienceId={exp.id} saved={!!saved} saveCount={exp.saveCount} title={exp.title} variant="inline" />
           <ShareButton url={path} title={exp.title} text={exp.summary} />
         </div>
       </header>
@@ -244,7 +247,8 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                   </p>
                   <FollowButton hostSlug={exp.host.slug} hostName={exp.host.displayName} following={following} />
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <HostRating rating={hostRating} size="md" className="mt-1" />
+                <p className="mt-1 text-sm text-muted-foreground">
                   {HOST_TYPES[exp.host.hostType].label} · {exp.host.tagline}
                   {exp.host.followerCount > 0 && ` · ${formatCompact(exp.host.followerCount)} followers (fictional)`}
                 </p>
