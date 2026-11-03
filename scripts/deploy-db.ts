@@ -9,6 +9,8 @@ import "dotenv/config";
 import { execSync } from "node:child_process";
 import { Client } from "pg";
 
+import { applyEventImages } from "./apply-event-images";
+
 async function main() {
   const migrateUrl = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
   if (!migrateUrl) throw new Error("DATABASE_URL is not set. Connect a Postgres database (for example Neon) first.");
@@ -27,6 +29,9 @@ async function main() {
     execSync("npx tsx prisma/seed.ts", { stdio: "inherit", env: { ...process.env, DATABASE_URL: migrateUrl } });
   } else {
     console.log(`Demo data already present (${rows[0].n} experiences); skipping seed.`);
+    // Additive only: put Tastable's event images in front of the sample events' photos.
+    const added = await applyEventImages(migrateUrl);
+    console.log(`Event images: ${added} cover(s) added.`);
   }
 }
 

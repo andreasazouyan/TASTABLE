@@ -2,12 +2,12 @@ import { test as base, expect, type Page } from "@playwright/test";
 
 /**
  * Test fixture that skips remote photography (the <Photo> fallback covers it), so runs are
- * fast and work offline.
+ * fast and work offline. Tastable's own local event images still load.
  */
 export const test = base.extend<{ blockImages: void }>({
   blockImages: [
     async ({ page }, use) => {
-      await page.route(/images\.unsplash\.com|\/_next\/image/, (route) => route.abort());
+      await page.route(/images\.unsplash\.com|\/_next\/image\?url=https/, (route) => route.abort());
       await use();
     },
     { auto: true },

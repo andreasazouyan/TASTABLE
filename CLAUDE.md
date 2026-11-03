@@ -100,7 +100,13 @@ tests/e2e            Playwright journeys against a production build and prisma/e
   the booking (`src/server/services/reviews.ts`). One rating calculation: `ratingSummary` in
   `src/lib/reviews.ts`. Reports never hide a review automatically.
 - **Event content**: structured menu sections, itinerary (minutes from start) and featured dishes;
-  the legacy `Experience.menu` JSON is kept in sync by `saveEvent`.
+  the legacy `Experience.menu` JSON is kept in sync by `saveEvent`. Guests see them through
+  `EventMenu` ("The Menu" / "What You'll Cook" / "What You'll Enjoy", menu status) and
+  `ExperienceTimeline` ("Your Experience", New York time); the host wizard previews the same components.
+- **Event images**: Tastable's own images live in `public/tastable-event-images` and are matched to
+  sample events by filename in `src/lib/domain/event-images.ts` (cover photo; Unsplash placeholders
+  fill the rest). `scripts/apply-event-images.ts` adds them to already-seeded databases (additive,
+  idempotent, fictional events only; runs in `vercel-build`).
 - **Migrations are additive only** (no drops/renames/deletes, no invented backfills). Run
   `npm run db:check` for read-only integrity checks.
 - Money is stored in integer cents. Platform fee 10% of net ticket revenue; guest service fee 6% capped at $25.
