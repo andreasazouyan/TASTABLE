@@ -3,7 +3,7 @@ import { availability, seatsLeft } from "@/lib/booking/capacity";
 import { bookingReference, ticketCode } from "@/lib/booking/codes";
 import { simulateCharge } from "@/lib/booking/payment";
 import { quote, sessionUnitPrice } from "@/lib/booking/pricing";
-import { computeRefund, policySnapshot, type RefundQuote } from "@/lib/booking/refunds";
+import { cancellationFee, computeRefund, policySnapshot, type RefundQuote } from "@/lib/booking/refunds";
 import { DomainError } from "@/server/services/errors";
 
 type Db = PrismaClient;
@@ -78,6 +78,8 @@ export async function createBooking(db: Db, input: CreateBookingInput, now: Date
         dietaryRequirements: input.dietaryRequirements || null,
         policyAcknowledgedAt: now,
         policySnapshot: policySnapshot(policy),
+        cancellationPolicyId: policy.id,
+        cancellationPolicyVersion: policy.version,
         paymentStatus: "SIMULATED_PAID",
         paymentReference: charge.reference,
         isFictional: false,
@@ -156,6 +158,7 @@ export async function cancelBooking(
       args.actor === "GUEST" ? "GUEST" : "HOST",
     );
 
+    const fee = cancellationFee(booking, refund);
     const transitioned = await tx.booking.updateMany({
       where: { id: booking.id, status: booking.status },
       data: {
@@ -164,6 +167,8 @@ export async function cancelBooking(
         cancelledBy: args.actor,
         cancellationReason: args.reason ?? null,
         refundAmountCents: refund.refundCents,
+        cancellationFeeCents: fee.feeCents,
+        cancellationFeePercent: fee.feePercent,
         paymentStatus:
           refund.refundCents === 0
             ? "SIMULATED_PAID"

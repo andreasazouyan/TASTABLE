@@ -13,7 +13,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { quote } from "../src/lib/booking/pricing";
-import { computeRefund, policySnapshot } from "../src/lib/booking/refunds";
+import { cancellationFee, computeRefund, policySnapshot } from "../src/lib/booking/refunds";
 import { nyDateTime, serverNow } from "../src/lib/clock";
 import { getNeighborhood } from "../src/lib/domain/neighborhoods";
 import { PHOTOS } from "../src/lib/domain/photos";
@@ -27,6 +27,7 @@ import {
   VENUES,
   type ExperienceSeed,
 } from "./seed-data";
+import { seedFoundation } from "./seed-foundation";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -68,6 +69,13 @@ const hoursMs = (n: number) => n * 3_600_000;
 
 async function wipe() {
   // Children first. The database enforces foreign keys, so order matters.
+  await db.reviewReport.deleteMany();
+  await db.review.deleteMany();
+  await db.guestFavoriteDish.deleteMany();
+  await db.experienceDish.deleteMany();
+  await db.experienceItineraryStep.deleteMany();
+  await db.experienceMenuItem.deleteMany();
+  await db.experienceMenuSection.deleteMany();
   await db.calendarShareItem.deleteMany();
   await db.calendarSharingPreference.deleteMany();
   await db.eventInvitation.deleteMany();
@@ -379,6 +387,9 @@ async function main() {
         dietaryRequirements: rand() < 0.2 ? pick(["Vegetarian", "No shellfish", "Nut allergy", "Gluten-free", "Vegan"]) : null,
         policyAcknowledgedAt: createdAt,
         policySnapshot: policySnapshot(policy),
+        cancellationPolicyId: policyIds.get(e.policy)!,
+        cancellationPolicyVersion: 1,
+        ...(args.cancel ? (({ feeCents, feePercent }) => ({ cancellationFeeCents: feeCents, cancellationFeePercent: feePercent }))(cancellationFee(price, { tier: "FULL", refundCents: refund })) : {}),
         cancelledAt,
         cancelledBy: args.cancel ? "GUEST" : null,
         cancellationReason: args.cancel ? pick(["Plans changed", "Feeling unwell", "Travel conflict"]) : null,
@@ -561,7 +572,10 @@ async function main() {
     });
   }
 
+  const foundation = await seedFoundation(db, NOW);
+
   const counts = {
+    ...foundation,
     users: await db.user.count(),
     hosts: await db.hostProfile.count(),
     venues: await db.venue.count(),

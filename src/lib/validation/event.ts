@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { CATEGORY_IDS } from "@/lib/domain/categories";
 import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
+import { MAX_CUSTOM_DISH_LENGTH } from "@/lib/domain/dishes";
+import { itineraryInput, itineraryProblems, MENU_STATUS_IDS, menuSectionsInput } from "@/lib/domain/event-content";
 import { CUISINE_KEYS, DIETARY_OPTIONS, FORMAT_IDS, HOST_TYPE_IDS, OCCASION_KEYS } from "@/lib/domain/taxonomy";
 
 const neighborhoodKeys = NEIGHBORHOODS.map((n) => n.key) as [string, ...string[]];
@@ -50,7 +52,11 @@ export const eventInput = z.object({
   format: z.enum(FORMAT_IDS),
   occasions: z.array(z.enum(OCCASION_KEYS)).default([]),
   socialAtmosphere: z.enum(["MEET_NEW_PEOPLE", "BRING_YOUR_PEOPLE", "EITHER_WAY"]),
-  photos: z.array(z.object({ url: z.url("Photo must be a full https URL"), alt: z.string().trim().min(3, "Describe each photo").max(160) })).max(6).default([]),
+  photos: z
+    .array(z.object({ url: z.url("Photo must be a full https URL"), alt: z.string().trim().min(3, "Describe each photo").max(160) }))
+    .max(6)
+    .default([])
+    .refine((photos) => new Set(photos.map((p) => p.url)).size === photos.length, "Each photo can only be added once"),
   venue: venueInput,
   sessions: z.array(sessionInput).max(20).default([]),
   ticketPriceDollars: z.coerce.number().min(5, "Minimum ticket price is $5").max(2000),
@@ -59,6 +65,13 @@ export const eventInput = z.object({
   menu: z.array(z.object({ title: z.string().trim().min(1).max(80), description: z.string().trim().max(200).default("") })).max(15).default([]),
   inclusions: z.array(z.string().trim().min(1).max(120)).max(10).default([]),
   dietaryOptions: z.array(z.enum(dietaryKeys)).default([]),
+  // Structured content (optional so older clients keep working; omitted = leave unchanged,
+  // except menuSections, which is derived from `menu` when omitted).
+  menuSections: menuSectionsInput.optional(),
+  menuStatus: z.enum(MENU_STATUS_IDS).optional(),
+  itinerary: itineraryInput.optional(),
+  /** Featured dishes: catalog keys or free text, normalized on save. */
+  featuredDishes: z.array(z.string().trim().min(1).max(MAX_CUSTOM_DISH_LENGTH)).max(8).optional(),
   policy: policyInput,
   intent: z.enum(["draft", "publish"]),
 });
@@ -66,12 +79,16 @@ export const eventInput = z.object({
 export type EventInput = z.infer<typeof eventInput>;
 
 /** Extra rules that only apply when publishing. Returns a list of human-readable problems. */
-export function publishProblems(e: Pick<EventInput, "venue" | "sessions" | "photos" | "menu">, venueIsPlaceholder = false) {
+export function publishProblems(
+  e: Pick<EventInput, "venue" | "sessions" | "photos" | "menu"> & Partial<Pick<EventInput, "menuSections" | "menuStatus" | "itinerary" | "durationMinutes">>,
+  venueIsPlaceholder = false,
+) {
   const problems: string[] = [];
   if (e.venue.mode === "tbc" || venueIsPlaceholder) problems.push("Add a confirmed venue before publishing (venue requests don't secure a venue).");
   if (!e.sessions.length) problems.push("Add at least one date and time.");
   if (!e.photos.length) problems.push("Add at least one photo.");
-  if (!e.menu.length) problems.push("Add the menu or activities.");
+  if (!e.menu.length && !e.menuSections?.length && e.menuStatus !== "TO_BE_ANNOUNCED") problems.push("Add the menu or activities, or mark the menu as to be announced.");
+  if (e.itinerary?.length) problems.push(...itineraryProblems(e.itinerary, e.durationMinutes));
   return problems;
 }
 

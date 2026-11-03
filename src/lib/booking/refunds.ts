@@ -97,3 +97,15 @@ export function policySnapshot(policy: PolicyTerms) {
     partialRefundPercent: policy.partialRefundPercent,
   });
 }
+
+/**
+ * The cancellation fee implied by a refund quote: the share of the TICKET SUBTOTAL that is kept.
+ * The service fee is itemized separately and is not part of this fee. Host and system
+ * cancellations never carry a fee. Integer cents; percent is 0–100.
+ */
+export function cancellationFee(booking: { subtotalCents: number }, refund: Pick<RefundQuote, "tier" | "refundCents">) {
+  if (refund.tier === "HOST_CANCELLED" || booking.subtotalCents <= 0) return { feeCents: 0, feePercent: 0 };
+  const ticketRefund = Math.min(refund.refundCents, booking.subtotalCents);
+  const feeCents = Math.max(booking.subtotalCents - ticketRefund, 0);
+  return { feeCents, feePercent: Math.round((feeCents * 100) / booking.subtotalCents) };
+}
