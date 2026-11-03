@@ -1,6 +1,5 @@
 import "server-only";
 
-import type { PrefsValue } from "@/components/onboarding/preference-steps";
 import type { AttendancePreference } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { CATEGORY_IDS } from "@/lib/domain/categories";
@@ -9,17 +8,6 @@ import { parseList } from "@/lib/domain/lists";
 import { getNeighborhood } from "@/lib/domain/neighborhoods";
 import { DAY_KEYS, onboardingStatus, PREFERENCE_CUISINE_KEYS, TIME_SLOT_KEYS, TRAVEL_MINUTES, type TravelMinutes } from "@/lib/domain/preferences";
 import { MOTIVATION_KEYS } from "@/lib/domain/taxonomy";
-
-export function toPrefsValue(p: { locationKey: string; travelRadiusMiles: number | null; favoriteCuisines: string; favoriteCategories: string; motivations: string; maxBudgetCents?: number | null } | null | undefined): PrefsValue {
-  return {
-    locationKey: p?.locationKey ?? "nyc",
-    travelRadiusMiles: p?.travelRadiusMiles ?? null,
-    cuisines: parseList(p?.favoriteCuisines),
-    categories: parseList(p?.favoriteCategories),
-    motivations: parseList(p?.motivations),
-    maxBudgetDollars: p?.maxBudgetCents ? p.maxBudgetCents / 100 : null,
-  };
-}
 
 // ─── Full preference read model ──────────────────────────────────────────────────────────────
 

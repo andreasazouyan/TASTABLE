@@ -170,3 +170,21 @@ describe("audience insights (aggregated, privacy-safe)", () => {
     expect(ctx.topCuisines.length).toBeGreaterThan(0);
   });
 });
+
+describe("profile edits flow into aggregated insights", () => {
+  it("changing neighborhood, slot, cuisine and dish moves the guest without double counting", async () => {
+    const guests = ["gst_bg-0", "gst_bg-1", "gst_bg-2", "gst_bg-4", "gst_bg-5"];
+    const bucket = async (dim: "neighborhood" | "time" | "cuisine" | "dish", key: string) =>
+      (await getAudienceInsights()).breakdowns![dim].buckets.find((b) => b.key === key)?.guests ?? 0;
+    const before = { hood: await bucket("neighborhood", "upper-west-side"), slot: await bucket("time", "14-16"), thai: await bucket("cuisine", "thai") };
+    const eligible = (await getAudienceInsights()).eligibleGuests;
+    for (const g of guests) {
+      await saveGuestPreferences(db, g, { locationKey: "upper-west-side", preferredTimes: ["14-16"], cuisines: ["thai"], favoriteDishes: [{ key: "pho" }] }, now, { complete: true });
+    }
+    expect(await bucket("neighborhood", "upper-west-side")).toBe(before.hood + guests.length);
+    expect(await bucket("time", "14-16")).toBe(before.slot + guests.length);
+    expect(await bucket("cuisine", "thai")).toBe(before.thai + guests.length);
+    expect(await bucket("dish", "pho")).toBeGreaterThanOrEqual(guests.length);
+    expect((await getAudienceInsights()).eligibleGuests).toBe(eligible);
+  });
+});
