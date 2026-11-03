@@ -31,7 +31,7 @@ async function main() {
     console.log(`Demo data already present (${rows[0].n} experiences); skipping seed.`);
     // Additive only: put Tastable's event images in front of the sample events' photos.
     const added = await applyEventImages(migrateUrl);
-    console.log(`Event images: ${added} cover(s) added.`);
+    console.log(`Event images: ${added} image(s) added.`);
   }
 }
 

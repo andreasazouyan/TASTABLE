@@ -16,7 +16,7 @@ import { quote } from "../src/lib/booking/pricing";
 import { cancellationFee, computeRefund, policySnapshot } from "../src/lib/booking/refunds";
 import { nyDateTime, serverNow } from "../src/lib/clock";
 import { getNeighborhood } from "../src/lib/domain/neighborhoods";
-import { EVENT_IMAGE_CREDIT, eventImageFor } from "../src/lib/domain/event-images";
+import { EVENT_IMAGE_CREDIT, eventImagesFor } from "../src/lib/domain/event-images";
 import { PHOTOS } from "../src/lib/domain/photos";
 import { isoDateNY } from "../src/lib/format";
 import {
@@ -218,7 +218,7 @@ async function main() {
         photos: {
           // Tastable's own image (matched by filename) leads when there is one; placeholders follow.
           create: [
-            ...(eventImageFor(e.slug) ? [{ ...eventImageFor(e.slug)!, credit: EVENT_IMAGE_CREDIT }] : []),
+            ...eventImagesFor(e.slug).map((p) => ({ ...p, credit: EVENT_IMAGE_CREDIT })),
             ...e.photos.map((key) => ({ url: PHOTOS[key].src, alt: PHOTOS[key].alt, credit: "Unsplash (placeholder)" })),
           ]
             .slice(0, 3)

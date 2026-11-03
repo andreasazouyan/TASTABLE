@@ -46,8 +46,8 @@ test("event pages show the structured menu by category, dietary labels and the i
 });
 
 test("Tastable's event images load on cards and detail pages, on desktop and mobile", async ({ page, request }) => {
-  const { EVENT_IMAGES, EVENT_IMAGE_DIR } = await import("../../src/lib/domain/event-images");
-  for (const { file } of Object.values(EVENT_IMAGES)) {
+  const { ALL_EVENT_IMAGE_FILES, EVENT_IMAGE_DIR } = await import("../../src/lib/domain/event-images");
+  for (const file of ALL_EVENT_IMAGE_FILES) {
     const res = await request.get(`${EVENT_IMAGE_DIR}/${file}`);
     expect(res.status(), file).toBe(200);
   }
@@ -61,7 +61,12 @@ test("Tastable's event images load on cards and detail pages, on desktop and mob
     await expect.poll(() => cover.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
     expect(await cover.evaluate((img: HTMLImageElement) => getComputedStyle(img).objectFit)).toBe("cover");
 
+    // Second batch: the taco pop-up's own cover, and detail images in the gallery.
+    const taco = page.getByRole("article").filter({ has: page.getByRole("link", { name: "One-Night Taco Pop-Up" }) }).getByRole("img", { name: /Three tacos with lime/ }).first();
+    await expect(taco).toBeAttached();
+
     await page.goto("/experiences/italian-pasta-making-workshop");
+    if (viewport.width > 640) await expect(page.getByRole("img", { name: "Guests cooking together around a kitchen counter" }).first()).toBeVisible();
     const hero = page.getByRole("img", { name: "Hands lifting fresh pasta from a floured board" }).first();
     await expect(hero).toBeVisible();
     await expect.poll(() => hero.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
