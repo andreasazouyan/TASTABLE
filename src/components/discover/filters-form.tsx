@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useTransition } from "react";
 
+import { WhenFilter } from "@/components/discover/when-filter";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/lib/domain/categories";
 import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
@@ -19,6 +20,12 @@ function toQuery(form: HTMLFormElement) {
   for (const key of new Set(fd.keys())) {
     const values = fd.getAll(key).map(String).filter(Boolean);
     if (values.length) sp.set(key, (MULTI as readonly string[]).includes(key) ? values.join(",") : values[0]);
+  }
+  // A quick date option (Today, Tomorrow…) replaces any chosen dates.
+  const when = sp.get("when");
+  if (when && when !== "custom") {
+    sp.delete("from");
+    sp.delete("to");
   }
   return sp.toString();
 }
@@ -77,7 +84,6 @@ export function FiltersForm({ filters, className, onApplied }: { filters: Discov
       {filters.q && <input type="hidden" name="q" value={filters.q} />}
       {filters.collection && <input type="hidden" name="collection" value={filters.collection} />}
       {filters.sort && <input type="hidden" name="sort" value={filters.sort} />}
-      {filters.date && <input type="hidden" name="date" value={filters.date} />}
 
       <Fieldset legend="Location">
         <label className="mb-1.5 block text-muted-foreground" htmlFor="f-near">
@@ -104,17 +110,13 @@ export function FiltersForm({ filters, className, onApplied }: { filters: Discov
         {!filters.near && <p className="mt-1.5 text-xs text-muted-foreground">Choose a neighborhood to filter by distance.</p>}
       </Fieldset>
 
-      <Fieldset legend="Dates">
-        <div className="grid grid-cols-2 gap-2">
-          <label className="text-muted-foreground">
-            From
-            <input type="date" name="from" defaultValue={filters.from} className={cn(fieldClass, "mt-1.5")} />
-          </label>
-          <label className="text-muted-foreground">
-            To
-            <input type="date" name="to" defaultValue={filters.to} min={filters.from} className={cn(fieldClass, "mt-1.5")} />
-          </label>
-        </div>
+      <Fieldset legend="When">
+        <WhenFilter
+          key={[filters.when, filters.date, filters.from, filters.to].join("|")}
+          filters={filters}
+          fieldClass={fieldClass}
+          onClear={() => push()}
+        />
       </Fieldset>
 
       <Fieldset legend="Category">

@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import { isBookable } from "@/lib/booking/capacity";
-import { nyDateTime, nyDayRange } from "@/lib/clock";
+import { nyDateTime } from "@/lib/clock";
+import { dateWindow, WHEN_KEYS } from "@/lib/discovery/dates";
 import { CATEGORIES } from "@/lib/domain/categories";
 import { distanceMiles, getNeighborhood } from "@/lib/domain/neighborhoods";
 import { CUISINE_KEYS, FORMAT_IDS, HOST_TYPE_IDS, OCCASION_KEYS } from "@/lib/domain/taxonomy";
@@ -52,6 +53,7 @@ export const filtersSchema = z.object({
   format: csv(FORMAT_IDS),
   near: z.string().optional().refine((v) => !v || !!getNeighborhood(v)).catch(undefined),
   within: z.coerce.number().int().refine((v) => [1, 2, 5, 10].includes(v)).optional().catch(undefined),
+  when: z.enum(WHEN_KEYS).optional().catch(undefined),
   date: z.iso.date().optional().catch(undefined),
   from: z.iso.date().optional().catch(undefined),
   to: z.iso.date().optional().catch(undefined),
@@ -85,7 +87,8 @@ export function filtersToQuery(f: Partial<DiscoveryFilters>): string {
 export function activeFilterCount(f: DiscoveryFilters) {
   let n = 0;
   for (const k of ["category", "cuisine", "host", "occasion", "format"] as const) n += f[k].length ? 1 : 0;
-  for (const k of ["q", "near", "date", "from", "minPrice", "maxPrice", "spots", "collection"] as const) n += f[k] !== undefined ? 1 : 0;
+  for (const k of ["q", "near", "minPrice", "maxPrice", "spots", "collection"] as const) n += f[k] !== undefined ? 1 : 0;
+  if (f.when || f.date || f.from || f.to) n += 1;
   return n;
 }
 
@@ -124,15 +127,13 @@ export function inCollection(l: Listing, key: CollectionKey): boolean {
   }
 }
 
+function intersect(a: { start: Date; end: Date } | null, b: { start: Date; end: Date } | null) {
+  if (!a || !b) return a ?? b;
+  return { start: new Date(Math.max(+a.start, +b.start)), end: new Date(Math.min(+a.end, +b.end)) };
+}
+
 function sessionWindow(f: DiscoveryFilters, now: Date): { start: Date; end: Date } | null {
-  if (f.collection === "this-weekend") return weekendWindow(now);
-  if (f.date) return nyDayRange(f.date);
-  if (f.from || f.to) {
-    const start = f.from ? nyDayRange(f.from).start : now;
-    const end = f.to ? nyDayRange(f.to).end : new Date(8640000000000000);
-    return { start, end };
-  }
-  return null;
+  return intersect(f.collection === "this-weekend" ? weekendWindow(now) : null, dateWindow(f, now));
 }
 
 /**
@@ -162,7 +163,7 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
     const distance = origin ? distanceMiles(origin, l.venue) : null;
     if (origin && f.within && distance !== null && distance > f.within) continue;
 
-    let sessions: ListingSession[] = l.sessions.filter((s) => s.availability !== "PAST" && s.availability !== "CANCELLED");
+    let sessions: ListingSession[] = l.sessions.filter((s) => s.availability !== "PAST" && s.availability !== "CANCELLED" && s.startsAt > now);
     if (window) sessions = sessions.filter((s) => s.startsAt >= window.start && s.startsAt < window.end);
     if (f.minPrice !== undefined) sessions = sessions.filter((s) => s.priceCents >= f.minPrice! * 100);
     if (f.maxPrice !== undefined) sessions = sessions.filter((s) => s.priceCents <= f.maxPrice! * 100);

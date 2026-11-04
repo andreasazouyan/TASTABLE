@@ -22,6 +22,7 @@ import {
   parseFilters,
   type DiscoveryFilters,
 } from "@/lib/discovery/filters";
+import { WHEN_OPTIONS } from "@/lib/discovery/dates";
 import { formatDate } from "@/lib/format";
 import { nyDateTime } from "@/lib/clock";
 import { requestNow } from "@/lib/request-clock";
@@ -53,9 +54,17 @@ function chipsFor(f: DiscoveryFilters): Chip[] {
   if (f.near) chips.push({ label: getNeighborhood(f.near)!.name, href: without({ near: undefined, within: undefined }) });
   if (f.near && f.within) chips.push({ label: `Within ${f.within} mi`, href: without({ within: undefined }) });
   const dateLabel = (iso: string) => formatDate(nyDateTime(iso, 12), { month: "short", day: "numeric" });
-  if (f.date) chips.push({ label: dateLabel(f.date), href: without({ date: undefined }) });
-  if (f.from) chips.push({ label: `From ${dateLabel(f.from)}`, href: without({ from: undefined }) });
-  if (f.to) chips.push({ label: `Until ${dateLabel(f.to)}`, href: without({ to: undefined }) });
+  const noDates = { when: undefined, date: undefined, from: undefined, to: undefined };
+  if (f.when && f.when !== "custom") chips.push({ label: WHEN_OPTIONS.find((o) => o.key === f.when)!.label, href: without(noDates) });
+  else if (f.when === "custom") {
+    const first = f.from ?? f.to ?? f.date;
+    const last = f.from && f.to && f.to > f.from ? f.to : null;
+    if (first) chips.push({ label: last ? `${dateLabel(first)} – ${dateLabel(last)}` : dateLabel(first), href: without(noDates) });
+  } else {
+    if (f.date) chips.push({ label: dateLabel(f.date), href: without({ date: undefined }) });
+    if (f.from) chips.push({ label: `From ${dateLabel(f.from)}`, href: without({ from: undefined }) });
+    if (f.to) chips.push({ label: `Until ${dateLabel(f.to)}`, href: without({ to: undefined }) });
+  }
   for (const slug of f.category)
     chips.push({ label: CATEGORIES.find((c) => c.slug === slug)!.shortName, href: without({ category: f.category.filter((x) => x !== slug) }) });
   for (const k of f.cuisine) chips.push({ label: cuisineLabel(k), href: without({ cuisine: f.cuisine.filter((x) => x !== k) }) });
