@@ -102,6 +102,9 @@ tests/e2e            Playwright journeys against a production build and prisma/e
 - **Host audience insights** (`src/server/queries/audience-insights.ts`) aggregate in SQL and
   apply `src/lib/analytics/privacy.ts` thresholds (segment >= 10, bucket >= 5). Never return
   per-guest rows or identities to hosts.
+- **Culinary Demand Insights** (`/host/insights`) renders `getAudienceInsights` (stated interest) beside
+  `bookedByCategory` (actual bookings, kept separate). Labels and rule-based "Smart insights" live in
+  `src/lib/analytics/demand-insights.ts`; every insight states its counts and fires only on visible buckets.
 - **NYC locations**: one vocabulary in `src/lib/domain/neighborhoods.ts` (five `BOROUGHS`, ~150
   `NEIGHBORHOODS` with aliases for older spellings). Venues store the neighborhood/borough *name*;
   resolve with `neighborhoodForName` / `boroughKeyForName`. Discover's `borough` + `neighborhood`

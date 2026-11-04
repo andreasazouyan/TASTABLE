@@ -41,6 +41,7 @@ function audienceCte(f: AudienceFilters) {
   return Prisma.sql`
     WITH prefs AS (
       SELECT p."id",
+             p."guestProfileId" AS gid,
              p."locationKey" AS hood,
              p."maxTravelMinutes" AS travel,
              p."attendancePreference"::text AS attendance,
@@ -84,6 +85,12 @@ export type AudienceInsights = {
   dishByNeighborhood: { dish: string; neighborhood: string; guests: number }[] | null;
   /** Category interest among guests who also chose each cuisine (for rule-based insights). */
   categoryByCuisine: { cuisine: string; category: string; guests: number }[] | null;
+  /**
+   * Actual behaviour, kept apart from stated interest: segment guests with at least one confirmed or
+   * completed booking in each category (all recorded bookings; no time trend is implied).
+   * null guests = under the privacy threshold.
+   */
+  bookedByCategory: { category: string; guests: number | null }[] | null;
 };
 
 /** Aggregated, privacy-safe audience insights. Filters combine with AND. */
@@ -98,7 +105,7 @@ export async function getAudienceInsights(filters: AudienceFilters = {}): Promis
   const base = { basis: "stated-preferences" as const, dataSource: dataSource as AudienceInsights["dataSource"], eligibleGuests: totals.eligible, filters };
 
   if (!segmentAllowed(totals.segment)) {
-    return { ...base, segment: { allowed: false, minimum: MIN_SEGMENT_SIZE }, breakdowns: null, heatmap: null, dishByNeighborhood: null, categoryByCuisine: null };
+    return { ...base, segment: { allowed: false, minimum: MIN_SEGMENT_SIZE }, breakdowns: null, heatmap: null, dishByNeighborhood: null, categoryByCuisine: null, bookedByCategory: null };
   }
 
   const counts = await db.$queryRaw<CountRow[]>`
@@ -118,6 +125,15 @@ export async function getAudienceInsights(filters: AudienceFilters = {}): Promis
     UNION ALL SELECT 'dishHood', k, hood, count(DISTINCT id)::int FROM seg, unnest(dishes) k WHERE hood <> 'nyc' GROUP BY k, hood
     UNION ALL SELECT 'catCuisine', c, k, count(DISTINCT id)::int FROM seg, unnest(cuisines) c, unnest(cats) k GROUP BY c, k`;
 
+  const booked = await db.$queryRaw<{ category: string; guests: number }[]>`
+    ${cte}
+    SELECT e."category"::text AS category, count(DISTINCT seg.gid)::int AS guests
+    FROM seg
+    JOIN "Booking" b ON b."guestId" = seg.gid AND b."status" IN ('CONFIRMED', 'COMPLETED')
+    JOIN "ExperienceSession" s ON s."id" = b."sessionId"
+    JOIN "Experience" e ON e."id" = s."experienceId"
+    GROUP BY e."category"`;
+
   const breakdowns = Object.fromEntries(
     AUDIENCE_DIMENSIONS.map((dim) => [dim, safeBuckets(counts.filter((r) => r.dim === dim).map((r) => ({ key: r.key, guests: r.guests })), totals.segment)]),
   ) as Record<AudienceDimension, BucketList>;
@@ -135,6 +151,7 @@ export async function getAudienceInsights(filters: AudienceFilters = {}): Promis
       .filter((r) => r.dim === "catCuisine" && safeCount(r.guests) !== null)
       .map((r) => ({ cuisine: r.a, category: r.b, guests: r.guests }))
       .sort((x, y) => y.guests - x.guests),
+    bookedByCategory: booked.map((r) => ({ category: r.category, guests: safeCount(r.guests) })),
   };
 }
 
