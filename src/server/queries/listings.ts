@@ -7,6 +7,7 @@ import { sessionUnitPrice } from "@/lib/booking/pricing";
 import { db } from "@/lib/db";
 import { parseList } from "@/lib/domain/lists";
 import type { Listing } from "@/lib/discovery/types";
+import { neighborhoodForName } from "@/lib/domain/neighborhoods";
 import { getHostRatings } from "@/server/queries/reviews";
 
 const COVER_BY_CATEGORY: Record<string, string> = {
@@ -62,7 +63,8 @@ export function toListing(row: Row, now: Date, views = 0, hostRating: Rating = N
     venue: {
       name: row.venue.name,
       type: row.venue.type,
-      neighborhood: row.venue.neighborhood,
+      // Shown and filtered with the shared NYC names (older spellings resolve to the same neighborhood).
+      neighborhood: neighborhoodForName(row.venue.neighborhood)?.name ?? row.venue.neighborhood,
       borough: row.venue.borough,
       lat: row.venue.latitude,
       lng: row.venue.longitude,

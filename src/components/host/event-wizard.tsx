@@ -11,10 +11,10 @@ import { Field, inputClass } from "@/components/host/field";
 import { ChoiceCard } from "@/components/onboarding/choice-card";
 import { Photo } from "@/components/site/photo";
 import { Button } from "@/components/ui/button";
+import { NeighborhoodOptions } from "@/components/site/neighborhood-options";
 import { nyDateTime } from "@/lib/clock";
 import { CATEGORIES } from "@/lib/domain/categories";
 import { itineraryProblems, legacyMenuFromSections, sectionsFromLegacyMenu, stepDuration } from "@/lib/domain/event-content";
-import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
 import { PHOTOS } from "@/lib/domain/photos";
 import { ATMOSPHERES, CUISINES, DIETARY_OPTIONS, FORMATS, OCCASIONS } from "@/lib/domain/taxonomy";
 import { cn } from "@/lib/utils";
@@ -267,11 +267,7 @@ export function EventWizard({
                       </Field>
                       <Field label="Neighborhood" htmlFor="vhood">
                         <select id="vhood" className={inputClass} value={newVenue.neighborhood} onChange={(e) => setNewVenue({ ...newVenue, neighborhood: e.target.value })}>
-                          {NEIGHBORHOODS.map((n) => (
-                            <option key={n.key} value={n.key}>
-                              {n.name}, {n.borough}
-                            </option>
-                          ))}
+                          <NeighborhoodOptions />
                         </select>
                       </Field>
                       <Field label="Maximum guests" htmlFor="vcap">

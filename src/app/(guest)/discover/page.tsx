@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/site/empty-state";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/demo";
 import { CATEGORIES } from "@/lib/domain/categories";
-import { getNeighborhood } from "@/lib/domain/neighborhoods";
+import { boroughKeyOf, getBorough, getNeighborhood } from "@/lib/domain/neighborhoods";
 import { cuisineLabel, FORMATS, HOST_TYPES, occasionLabel } from "@/lib/domain/taxonomy";
 import {
   COLLECTIONS,
@@ -23,6 +23,7 @@ import {
   type DiscoveryFilters,
 } from "@/lib/discovery/filters";
 import { WHEN_OPTIONS } from "@/lib/discovery/dates";
+import { resolveLocation } from "@/lib/discovery/location";
 import { formatDate } from "@/lib/format";
 import { nyDateTime } from "@/lib/clock";
 import { requestNow } from "@/lib/request-clock";
@@ -51,7 +52,13 @@ function chipsFor(f: DiscoveryFilters): Chip[] {
   const chips: Chip[] = [];
   if (f.collection) chips.push({ label: COLLECTIONS.find((c) => c.key === f.collection)!.title, href: without({ collection: undefined }) });
   if (f.q) chips.push({ label: `“${f.q}”`, href: without({ q: undefined }) });
-  if (f.near) chips.push({ label: getNeighborhood(f.near)!.name, href: without({ near: undefined, within: undefined }) });
+  const { wholeBoroughs } = resolveLocation(f.borough, f.neighborhood);
+  for (const b of wholeBoroughs) chips.push({ label: getBorough(b)!.name, href: without({ borough: f.borough.filter((x) => x !== b) }) });
+  for (const k of f.neighborhood) {
+    const n = getNeighborhood(k)!;
+    chips.push({ label: n.name, href: without({ neighborhood: f.neighborhood.filter((x) => x !== k), borough: f.borough.filter((x) => x !== boroughKeyOf(n) || f.neighborhood.some((y) => y !== k && boroughKeyOf(getNeighborhood(y)!) === x)) }) });
+  }
+  if (f.near) chips.push({ label: `Near ${getNeighborhood(f.near)!.name}`, href: without({ near: undefined, within: undefined }) });
   if (f.near && f.within) chips.push({ label: `Within ${f.within} mi`, href: without({ within: undefined }) });
   const dateLabel = (iso: string) => formatDate(nyDateTime(iso, 12), { month: "short", day: "numeric" });
   const noDates = { when: undefined, date: undefined, from: undefined, to: undefined };
@@ -153,9 +160,15 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
               <Button asChild>
                 <Link href="/discover">Clear all filters</Link>
               </Button>
-              <Button asChild variant="outline">
-                <Link href="/discover?collection=this-weekend">See this weekend</Link>
-              </Button>
+              {filters.borough.length + filters.neighborhood.length > 0 ? (
+                <Button asChild variant="outline">
+                  <Link href={`/discover?${filtersToQuery({ ...filters, borough: [], neighborhood: [] })}`}>Search all of NYC</Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline">
+                  <Link href="/discover?collection=this-weekend">See this weekend</Link>
+                </Button>
+              )}
             </EmptyState>
           ) : (
             <ul className="grid gap-x-5 gap-y-10 sm:grid-cols-2 xl:grid-cols-3" aria-label="Results">

@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 import { Field, inputClass } from "@/components/host/field";
 import { ChoiceCard } from "@/components/onboarding/choice-card";
 import { Button } from "@/components/ui/button";
-import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
+import { NeighborhoodOptions } from "@/components/site/neighborhood-options";
 import { CUISINES, HOST_TYPES } from "@/lib/domain/taxonomy";
 import { saveHostProfileAction, type FormState } from "@/server/actions/host";
 
@@ -62,11 +62,7 @@ export function HostProfileForm({ initial, submitLabel }: { initial: HostProfile
         <Field label="Location" htmlFor="homeNeighborhood" error={fe.homeNeighborhood}>
           <select id="homeNeighborhood" name="homeNeighborhood" defaultValue={initial.homeNeighborhood} className={inputClass} aria-invalid={!!fe.homeNeighborhood}>
             <option value="">Choose a neighborhood</option>
-            {NEIGHBORHOODS.map((n) => (
-              <option key={n.key} value={n.key}>
-                {n.name}, {n.borough}
-              </option>
-            ))}
+            <NeighborhoodOptions />
           </select>
         </Field>
         <Field label="Profile photo URL" htmlFor="profilePhotoUrl" error={fe.profilePhotoUrl} hint="Optional. Uploads aren't stored in this prototype; paste an https image link.">

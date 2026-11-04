@@ -4,7 +4,8 @@ import { isBookable } from "@/lib/booking/capacity";
 import { nyDateTime } from "@/lib/clock";
 import { dateWindow, WHEN_KEYS } from "@/lib/discovery/dates";
 import { CATEGORIES } from "@/lib/domain/categories";
-import { distanceMiles, getNeighborhood } from "@/lib/domain/neighborhoods";
+import { locationMatcher } from "@/lib/discovery/location";
+import { BOROUGH_KEYS, distanceMiles, getNeighborhood, NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
 import { CUISINE_KEYS, FORMAT_IDS, HOST_TYPE_IDS, OCCASION_KEYS } from "@/lib/domain/taxonomy";
 import { isoDateNY } from "@/lib/format";
 import type { Listing, ListingMatch, ListingSession } from "@/lib/discovery/types";
@@ -51,6 +52,8 @@ export const filtersSchema = z.object({
   host: csv(HOST_TYPE_IDS),
   occasion: csv(OCCASION_KEYS),
   format: csv(FORMAT_IDS),
+  borough: csv(BOROUGH_KEYS),
+  neighborhood: csv(NEIGHBORHOODS.map((n) => n.key)),
   near: z.string().optional().refine((v) => !v || !!getNeighborhood(v)).catch(undefined),
   within: z.coerce.number().int().refine((v) => [1, 2, 5, 10].includes(v)).optional().catch(undefined),
   when: z.enum(WHEN_KEYS).optional().catch(undefined),
@@ -89,6 +92,7 @@ export function activeFilterCount(f: DiscoveryFilters) {
   for (const k of ["category", "cuisine", "host", "occasion", "format"] as const) n += f[k].length ? 1 : 0;
   for (const k of ["q", "near", "minPrice", "maxPrice", "spots", "collection"] as const) n += f[k] !== undefined ? 1 : 0;
   if (f.when || f.date || f.from || f.to) n += 1;
+  if (f.borough.length || f.neighborhood.length) n += 1;
   return n;
 }
 
@@ -146,6 +150,7 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
   const origin = f.near ? getNeighborhood(f.near) : undefined;
   const window = sessionWindow(f, now);
   const q = f.q?.toLowerCase();
+  const inLocation = locationMatcher(f.borough, f.neighborhood);
 
   const out: ListingMatch[] = [];
   for (const l of listings) {
@@ -155,6 +160,7 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
     if (f.format.length && !f.format.includes(l.format as never)) continue;
     if (f.occasion.length && !f.occasion.some((o) => l.occasions.includes(o))) continue;
     if (f.collection && !inCollection(l, f.collection)) continue;
+    if (!inLocation(l.venue)) continue;
     if (q) {
       const hay = [l.title, l.summary, l.cuisine, l.host.displayName, l.venue.neighborhood, ...l.tags].join(" ").toLowerCase();
       if (!hay.includes(q)) continue;

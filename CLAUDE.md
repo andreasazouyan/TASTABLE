@@ -95,6 +95,11 @@ tests/e2e            Playwright journeys against a production build and prisma/e
 - **Host audience insights** (`src/server/queries/audience-insights.ts`) aggregate in SQL and
   apply `src/lib/analytics/privacy.ts` thresholds (segment >= 10, bucket >= 5). Never return
   per-guest rows or identities to hosts.
+- **NYC locations**: one vocabulary in `src/lib/domain/neighborhoods.ts` (five `BOROUGHS`, ~150
+  `NEIGHBORHOODS` with aliases for older spellings). Venues store the neighborhood/borough *name*;
+  resolve with `neighborhoodForName` / `boroughKeyForName`. Discover's `borough` + `neighborhood`
+  params (`src/lib/discovery/location.ts`): a borough with no neighborhoods ticked means the whole
+  borough. Discover's `when` param (`src/lib/discovery/dates.ts`) resolves quick dates in New York time.
 - **Saves**: `Experience.saveCount` = unique savers, changed only via `src/server/services/saved.ts`.
 - **Reviews**: one per booking/session, verified by a checked-in ticket, relationships derived from
   the booking (`src/server/services/reviews.ts`). One rating calculation: `ratingSummary` in
