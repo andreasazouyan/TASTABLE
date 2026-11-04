@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/booking/status-badge";
 import { EmptyState } from "@/components/site/empty-state";
 import { Photo } from "@/components/site/photo";
 import { Button } from "@/components/ui/button";
+import { ReminderBanners } from "@/components/booking/reminder-banners";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireGuest } from "@/lib/auth/demo";
 import { formatDate, formatMoney, formatTime } from "@/lib/format";
@@ -108,6 +109,7 @@ async function Bookings({ searchParams }: PageProps<"/bookings">) {
 
   return (
     <>
+      <ReminderBanners guestId={guest.id} now={now} />
       <nav aria-label="Booking views" className="mb-6 flex gap-1 overflow-x-auto rounded-full bg-muted p-1 sm:inline-flex">
         {TABS.map((t) => (
           <Link

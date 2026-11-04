@@ -65,7 +65,8 @@ test("guest: discover, filter, book two tickets, see ticket and calendar, cancel
   await page.goto(`/bookings/${reference}`);
   await page.getByRole("button", { name: /Cancel booking/ }).click();
   const confirm = page.getByRole("button", { name: /Confirm cancellation · refund \$/ });
-  await expect(confirm).toBeVisible();
+  await expect(confirm).toBeDisabled();
+  await page.getByRole("checkbox", { name: /I understand the fee is \$0\.00/ }).check();
   await confirm.click();
   await expect(page.getByRole("status").filter({ hasText: /cancelled/i }).first()).toBeVisible();
 

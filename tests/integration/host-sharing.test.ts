@@ -42,6 +42,24 @@ async function draft(over: Partial<EventInput> = {}): Promise<EventInput> {
 }
 
 describe("host events", () => {
+  it("rescheduling a booked date moves the guest's 24-hour reminder; cancelling the event cancels it", async () => {
+    const exp = await saveEvent(db, MAYA, await draft({ intent: "publish" }), now);
+    const session = await db.experienceSession.findFirstOrThrow({ where: { experienceId: exp.id } });
+    const booking = await createBooking(db, { guestId: "gst_zoe", sessionId: session.id, ticketCount: 1, contactName: "Zoe", contactEmail: "zoe@example.com", acknowledgedPolicy: true }, now);
+    await db.bookingReminder.update({ where: { bookingId: booking.id }, data: { status: "DISMISSED", dismissedAt: now } });
+
+    const newDate = isoDateNY(addDays(now, 12));
+    await saveEvent(db, MAYA, await draft({ intent: "publish", sessions: [{ id: session.id, date: newDate, time: "20:00", capacity: 10 }] }), now, exp.id);
+    const moved = await db.experienceSession.findUniqueOrThrow({ where: { id: session.id } });
+    const reminder = await db.bookingReminder.findUniqueOrThrow({ where: { bookingId: booking.id } });
+    expect(reminder.remindAt.getTime()).toBe(moved.startsAt.getTime() - 24 * 3_600_000);
+    expect(reminder.status).toBe("SCHEDULED");
+
+    await cancelEvent(db, MAYA, exp.id, now);
+    expect((await db.bookingReminder.findUniqueOrThrow({ where: { bookingId: booking.id } })).status).toBe("CANCELLED");
+    expect((await db.booking.findUniqueOrThrow({ where: { id: booking.id } })).refundAmountCents).toBe(booking.totalPriceCents);
+  });
+
   it("saves structured menus, menu status, featured dishes and itinerary; keeps the legacy menu in sync", async () => {
     const menuSections = [
       { title: "Main", description: "", items: [{ name: "Shoyu ramen", description: "Chicken and dashi", dietaryTags: ["dairy-free"] }, { name: "Mushroom ramen", description: "", dietaryTags: ["vegan"], imageUrl: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624", imageAlt: "Ramen" }] },

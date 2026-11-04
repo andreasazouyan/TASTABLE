@@ -51,6 +51,7 @@ test("Discover → book → confirmation → calendar updated → open ticket; c
 
   // Cancel: the calendar no longer shows it as an active booking.
   await page.getByRole("button", { name: /Cancel booking/ }).click();
+  await page.getByRole("checkbox", { name: /I understand the fee is/ }).check();
   await page.getByRole("button", { name: /Confirm cancellation/ }).click();
   await expect(page.getByRole("status").filter({ hasText: /cancelled/i }).first()).toBeVisible();
   await page.goto(`/calendar?view=week&date=${day}&day=${day}`);

@@ -174,7 +174,7 @@ export async function getFinanceData(hostId: string, from: Date, to: Date, now: 
   const [bookings, expenses, sessions, upcomingSessions, events] = await Promise.all([
     db.booking.findMany({
       where: { session: { experience: { hostId } }, createdAt: { gte: from, lt: to } },
-      select: { id: true, status: true, ticketCount: true, subtotalCents: true, serviceFeeCents: true, refundAmountCents: true, createdAt: true, sessionId: true },
+      select: { id: true, status: true, ticketCount: true, subtotalCents: true, serviceFeeCents: true, refundAmountCents: true, cancellationFeeCents: true, createdAt: true, sessionId: true },
     }),
     db.eventExpense.findMany({
       where: { hostId, incurredAt: { gte: from, lt: to } },
@@ -197,7 +197,7 @@ export async function getFinanceData(hostId: string, from: Date, to: Date, now: 
   // Bookings for the sessions in range (by event date), for the per-event table.
   const sessionBookings = await db.booking.findMany({
     where: { sessionId: { in: sessions.map((s) => s.id) } },
-    select: { id: true, status: true, ticketCount: true, subtotalCents: true, serviceFeeCents: true, refundAmountCents: true, createdAt: true, sessionId: true },
+    select: { id: true, status: true, ticketCount: true, subtotalCents: true, serviceFeeCents: true, refundAmountCents: true, cancellationFeeCents: true, createdAt: true, sessionId: true },
   });
   const sessionExpenses = await db.eventExpense.findMany({
     where: { hostId, sessionId: { in: sessions.map((s) => s.id) } },

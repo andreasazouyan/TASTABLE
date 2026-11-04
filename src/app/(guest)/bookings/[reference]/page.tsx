@@ -4,15 +4,17 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ArrowLeft, CalendarPlus, CircleCheck, KeyRound, MapPin } from "lucide-react";
 
+import { BookedDialog } from "@/components/booking/booked-dialog";
 import { CancelPanel } from "@/components/booking/cancel-panel";
 import { InviteForm } from "@/components/booking/invite-form";
+import { ReminderBanners } from "@/components/booking/reminder-banners";
 import { StatusBadge } from "@/components/booking/status-badge";
 import { ShareButton } from "@/components/experiences/share-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireGuest } from "@/lib/auth/demo";
 import { ticketQrSvg } from "@/lib/booking/qr";
-import { computeRefund } from "@/lib/booking/refunds";
+import { BOOKED_POLICY_NOTICE, describeTerms, formatTimeRemaining, lateFeeCents, quoteCancellation, termsFromSnapshot } from "@/lib/booking/cancellation";
 import { formatDate, formatDateTime, formatMoney, formatTime } from "@/lib/format";
 import { requestNow } from "@/lib/request-clock";
 import { getBookingByReference } from "@/server/queries/bookings";
@@ -39,7 +41,10 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
   const qrs = await Promise.all(b.tickets.map((t) => ticketQrSvg(t.code)));
   const upcoming = b.session.startsAt > now;
   const active = b.status === "CONFIRMED";
-  const refund = computeRefund(b, e.cancellationPolicy, b.session.startsAt, now);
+  // Always the terms accepted with this booking, never the event's current policy.
+  const terms = termsFromSnapshot(b.policySnapshot, e.cancellationPolicy);
+  const q = quoteCancellation(b, terms, b.session.startsAt, now);
+  const lateFee = terms.kind === "LATE_FEE" ? lateFeeCents(b.subtotalCents, terms.lateFeePercent) : null;
   const revealAddress = !e.venue.isSecretLocation || b.session.startsAt.getTime() - now.getTime() <= 24 * 3_600_000;
 
   return (
@@ -47,6 +52,21 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
       <Link href="/bookings" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> My Bookings
       </Link>
+
+      <ReminderBanners guestId={guest.id} now={now} />
+
+      {sp.confirmed && active && (
+        <BookedDialog
+          title={e.title}
+          dateLabel={formatDate(b.session.startsAt, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          timeLabel={`${formatTime(b.session.startsAt)} – ${formatTime(b.session.endsAt)}`}
+          tickets={b.ticketCount}
+          totalLabel={formatMoney(b.totalPriceCents)}
+          policyNotice={terms.kind === "LATE_FEE" ? BOOKED_POLICY_NOTICE : null}
+          feeSentence={lateFee !== null ? `For your ${formatMoney(b.subtotalCents)} booking, the late cancellation fee would be ${formatMoney(lateFee)}.` : null}
+          icsHref={`/api/bookings/${b.reference}/ics`}
+        />
+      )}
 
       {sp.confirmed && active && (
         <div role="status" className="mb-8 flex items-start gap-3 rounded-2xl bg-[#e5eddc] p-5 text-[#2f3d24]">
@@ -64,8 +84,10 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
         <div role="status" className="mb-8 rounded-2xl bg-muted p-5">
           <p className="font-medium">This booking is cancelled.</p>
           <p className="text-sm text-muted-foreground">
-            Cancelled {b.cancelledAt ? formatDateTime(b.cancelledAt) : ""}. Refund of {formatMoney(b.refundAmountCents)} recorded as a simulated
-            transaction{b.refundAmountCents === 0 ? " (no refund was due under the policy)" : ""}. Your seats were released.
+            Cancelled {b.cancelledAt ? formatDateTime(b.cancelledAt) : ""}.
+            {b.cancellationFeeCents ? ` A ${formatMoney(b.cancellationFeeCents)} cancellation fee was kept and ${formatMoney(b.refundAmountCents)} was refunded.` : ""}
+            {b.cancellationFeeCents ? " Recorded as a simulated transaction" : ` Refund of ${formatMoney(b.refundAmountCents)} recorded as a simulated transaction`}
+            {b.refundAmountCents === 0 && !b.cancellationFeeCents ? " (no refund was due under the policy)" : ""}. Your seats were released.
           </p>
         </div>
       )}
@@ -177,6 +199,12 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
               </div>
               {b.status === "CANCELLED" && (
                 <>
+                  {b.cancellationFeeCents ? (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Cancellation fee ({b.cancellationFeePercent}%)</dt>
+                      <dd>{formatMoney(b.cancellationFeeCents)}</dd>
+                    </div>
+                  ) : null}
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Refunded</dt>
                     <dd>{formatMoney(b.refundAmountCents)}</dd>
@@ -209,12 +237,31 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
             </div>
           )}
 
-          {active && upcoming && (
+          <div className="rounded-2xl border bg-card p-5 text-sm shadow-soft">
+            <h2 className="mb-2 text-lg">Your cancellation terms</h2>
+            <ul className="space-y-1 text-muted-foreground">
+              {describeTerms(terms).map((l) => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
+            {lateFee !== null && active && (
+              <p className="mt-2">
+                For this booking, the late cancellation fee would be <strong>{formatMoney(lateFee)}</strong>.
+              </p>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">Accepted when you booked. Later policy changes don&apos;t affect this booking.</p>
+          </div>
+
+          {active && upcoming && q.allowed && (
             <div className="pt-2">
               <CancelPanel
                 bookingId={b.id}
-                refundLabel={formatMoney(refund.refundCents)}
-                explanation={refund.explanation}
+                refundLabel={formatMoney(q.refundCents)}
+                paidLabel={formatMoney(b.totalPriceCents)}
+                feeLabel={formatMoney(q.feeCents)}
+                feePercent={q.feePercent}
+                timeRemaining={formatTimeRemaining(q.msUntilStart) ?? "Started"}
+                explanation={q.explanation}
                 calculatedAt={formatDateTime(now)}
               />
             </div>

@@ -29,6 +29,7 @@ import {
   type ExperienceSeed,
 } from "./seed-data";
 import { seedFoundation } from "./seed-foundation";
+import { reminderTime } from "../src/lib/booking/cancellation";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -580,6 +581,15 @@ async function main() {
   }
 
   const foundation = await seedFoundation(db, NOW);
+
+  // In-app reminders, 24 hours before, for confirmed bookings of upcoming sessions (shown in Tastable only).
+  const upcomingBookings = await db.booking.findMany({
+    where: { status: "CONFIRMED", session: { status: "SCHEDULED", startsAt: { gt: NOW } } },
+    select: { id: true, session: { select: { startsAt: true } } },
+  });
+  await db.bookingReminder.createMany({
+    data: upcomingBookings.map((b) => ({ id: `rem_${b.id}`, bookingId: b.id, remindAt: reminderTime(b.session.startsAt), createdAt: NOW })),
+  });
 
   const counts = {
     ...foundation,

@@ -80,8 +80,15 @@ tests/e2e            Playwright journeys against a production build and prisma/e
 - **Capacity lives on `ExperienceSession`** (`capacity`, `seatsReserved`). Bookings reserve seats with
   an atomic conditional `UPDATE` inside the transaction. Never show a session with 0 seats as
   available (`src/lib/booking/capacity.ts`).
-- **Refunds** are computed by `computeRefund()` from the event's `CancellationPolicy` and shown before
-  confirming. Cancellation is idempotent (conditional status transition).
+- **Refunds** are computed by `quoteCancellation()` (`src/lib/booking/cancellation.ts`) from the terms
+  snapshotted on the booking (`policySnapshot`), never the event's current policy, and shown before
+  confirming. New bookings accept the platform policy `LATE_FEE_24H_25`: free until 24h before (exactly
+  24h is on time), then a 25% fee on the ticket subtotal (not the service fee), kept from what was paid.
+  Older bookings keep their tiered terms. Cancellation is idempotent (conditional status transition) and
+  records `cancellationFeeCents`, which host finances keep.
+- **Reminders** are in-app only (`BookingReminder`, 24h before; `src/server/services/reminders.ts`),
+  moved on reschedule and cancelled with the booking. Booking .ics files carry a 24h VALARM. Never claim
+  an email or push reminder was sent.
 - **Authorization**: every host mutation goes through `assertOwnsExperience`. Guests only see their own
   bookings. Shared calendars expose event-level data only, behind non-guessable, revocable tokens.
 - **Venues**: never claim Tastable secured a venue. "Venue to be confirmed" events stay drafts.

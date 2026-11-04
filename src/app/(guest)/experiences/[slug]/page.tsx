@@ -19,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth/demo";
 import { availability, seatsLeft } from "@/lib/booking/capacity";
 import { sessionUnitPrice } from "@/lib/booking/pricing";
-import { describePolicy } from "@/lib/booking/refunds";
+import { describeTerms, STANDARD_LATE_FEE_TERMS } from "@/lib/booking/cancellation";
 import { getCategory } from "@/lib/domain/categories";
 import { menuItemSchema, parseJson, parseList, stringItem } from "@/lib/domain/lists";
 import { ATMOSPHERES, cuisineLabel, dietaryLabel, FORMATS, HOST_TYPES, occasionLabel } from "@/lib/domain/taxonomy";
@@ -301,13 +301,14 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
           </Section>
 
           <Section title="Cancellation policy" id="policy">
-            <p className="mb-3 font-medium">{exp.cancellationPolicy.name}</p>
+            {/* New bookings use Tastable's standard terms; earlier bookings keep the terms they accepted. */}
+            <p className="mb-3 font-medium">{STANDARD_LATE_FEE_TERMS.name}</p>
             <ul className="space-y-1.5 text-sm text-muted-foreground">
-              {describePolicy(exp.cancellationPolicy).map((l) => (
+              {describeTerms(STANDARD_LATE_FEE_TERMS).map((l) => (
                 <li key={l}>{l}</li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-muted-foreground">You&apos;ll see the exact refund amount before confirming any cancellation.</p>
+            <p className="mt-3 text-xs text-muted-foreground">You&apos;ll see the exact fee and refund before confirming any cancellation.</p>
           </Section>
         </div>
 

@@ -424,6 +424,16 @@ export const POLICIES = [
     partialRefundHours: 48,
     partialRefundPercent: 50,
   },
+  {
+    // Tastable's standard terms for new bookings (see src/lib/booking/cancellation.ts).
+    key: "LATE_FEE_24H_25",
+    name: "Tastable standard (24 hours)",
+    summary: "Free cancellation until 24 hours before the start. Cancellations made less than 24 hours before the event are subject to a fee of 25% of the ticket subtotal.",
+    fullRefundHours: 24,
+    partialRefundHours: null,
+    partialRefundPercent: 0,
+    lateFeePercent: 25,
+  },
 ] as const;
 
 /** Demo guests. Alex has not onboarded (to try onboarding); Jordan has. */

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock, Lock, MapPin, Share2, Ticket } from "lucide-react";
 
+import { ReminderBanners } from "@/components/booking/reminder-banners";
 import { ShareButton } from "@/components/experiences/share-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -193,6 +194,7 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
 
   return (
     <>
+      <ReminderBanners guestId={guest.id} now={now} />
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow mb-2">Your plans</p>
