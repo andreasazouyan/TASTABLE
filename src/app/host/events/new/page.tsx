@@ -9,15 +9,25 @@ import { addDays } from "@/lib/clock";
 import { isoDateNY } from "@/lib/format";
 import { requestNow } from "@/lib/request-clock";
 import type { EventInput } from "@/lib/validation/event";
+import { getEventCreationContext } from "@/server/queries/audience-insights";
 import { getHostVenues, getPolicyTemplates } from "@/server/queries/host";
+
+const TITLE = "Create an event";
+const DESCRIPTION = "Eight short steps. Save a draft at any point; publishing puts it in guest discovery.";
 
 export const metadata: Metadata = { title: "Create event" };
 
 export default function NewEventPage() {
   return (
     <div>
-      <PageHeader title="Create an event" description="Eight short steps. Save a draft at any point; publishing puts it in guest discovery." />
-      <Suspense fallback={<Skeleton className="h-[36rem] rounded-2xl" />}>
+      <Suspense
+        fallback={
+          <>
+            <PageHeader title={TITLE} description={DESCRIPTION} />
+            <Skeleton className="h-[36rem] rounded-2xl" />
+          </>
+        }
+      >
         <NewEvent />
       </Suspense>
     </div>
@@ -27,7 +37,7 @@ export default function NewEventPage() {
 async function NewEvent() {
   const { host } = await requireHost("/host/events/new");
   const now = await requestNow();
-  const [venues, policies] = await Promise.all([getHostVenues(host.id), getPolicyTemplates(host.id)]);
+  const [venues, policies, demand] = await Promise.all([getHostVenues(host.id), getPolicyTemplates(host.id), getEventCreationContext()]);
   const today = isoDateNY(now);
   const standard = policies.find((p) => p.key === "STANDARD_48H") ?? policies[0];
   const initial: EventInput = {
@@ -56,5 +66,5 @@ async function NewEvent() {
     policy: { mode: "template", templateId: standard?.id ?? "" },
     intent: "draft",
   };
-  return <EventWizard initial={initial} venues={venues} policies={policies} today={today} />;
+  return <EventWizard initial={initial} venues={venues} policies={policies} today={today} header={{ title: TITLE, description: DESCRIPTION }} ai={{ context: demand }} />;
 }

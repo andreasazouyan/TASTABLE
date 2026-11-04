@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, ImagePlus, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, ImagePlus, Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { EventMenu, menuHeading } from "@/components/experiences/event-menu";
+import { AiEventAssistant } from "@/components/host/ai-event-dialog";
+import { PageHeader } from "@/components/host/stat-tile";
 import { ExperienceTimeline } from "@/components/experiences/experience-timeline";
 import { FeaturedDishesEditor, ItineraryEditor, MenuSectionsEditor, MenuStatusField, menuProblems } from "@/components/host/event-content-editors";
 import { Field, inputClass } from "@/components/host/field";
@@ -17,6 +19,9 @@ import { CATEGORIES } from "@/lib/domain/categories";
 import { itineraryProblems, legacyMenuFromSections, sectionsFromLegacyMenu, stepDuration } from "@/lib/domain/event-content";
 import { PHOTOS } from "@/lib/domain/photos";
 import { ATMOSPHERES, CUISINES, DIETARY_OPTIONS, FORMATS, OCCASIONS } from "@/lib/domain/taxonomy";
+import { addIsoDays, isoWeekday } from "@/lib/discovery/dates";
+import { DAY_KEYS } from "@/lib/domain/preferences";
+import type { DemandContext, EventConcept } from "@/lib/event-concepts/generate";
 import { cn } from "@/lib/utils";
 import type { EventInput } from "@/lib/validation/event";
 import { saveEventAction } from "@/server/actions/host";
@@ -38,6 +43,8 @@ const VENUE_TYPES: Record<string, string> = {
 
 const STEPS = ["Basics", "Category", "Photos", "Venue", "Dates & price", "Menu", "Itinerary", "Policy", "Review"] as const;
 const REVIEW = STEPS.length - 1;
+/** Steps whose content a suggested concept fills in (Basics, Category, Dates & price, Menu, Itinerary). */
+const SUGGESTED_STEPS = new Set([0, 1, 4, 5, 6]);
 
 type NewVenue = { name: string; type: string; neighborhood: string; addressLine: string; maxCapacity: number; isSecretLocation: boolean };
 type Custom = { fullRefundHours: number; partialRefundHours: number | null; partialRefundPercent: number };
@@ -50,8 +57,14 @@ export function EventWizard({
   today,
   sold = {},
   live = false,
+  header,
+  ai,
 }: {
   live?: boolean;
+  /** Page header rendered by the wizard so the AI button can sit at its top right. */
+  header?: { title: string; description: string };
+  /** Aggregated demand for AI-assisted creation (new events only). */
+  ai?: { context: DemandContext };
   experienceId?: string;
   initial: EventInput;
   venues: Venue[];
@@ -78,6 +91,8 @@ export function EventWizard({
   const [custom, setCustom] = useState<Custom>({ fullRefundHours: 72, partialRefundHours: 24, partialRefundPercent: 50 });
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
+  const [aiApplied, setAiApplied] = useState(false);
+  const [aiConfirmed, setAiConfirmed] = useState(false);
 
   const set = <K extends keyof EventInput>(k: K, value: EventInput[K]) => setV((p) => ({ ...p, [k]: value }));
 
@@ -105,11 +120,59 @@ export function EventWizard({
     ...(payload.menu.length || payload.menuStatus === "TO_BE_ANNOUNCED" ? [] : ["The menu or activities (or mark the menu as to be announced)"]),
     ...menuProblems(payload.menuSections ?? []),
     ...itineraryStepProblems(payload),
+    ...(aiApplied && !aiConfirmed ? ["Your confirmation of the suggested details (tick the box below)"] : []),
   ];
   const previewStart = payload.sessions
     .filter((s) => s.date >= today)
     .map((s) => nyDateTime(s.date, ...(s.time.split(":").map(Number) as [number, number])))
     .sort((a, b) => a.getTime() - b.getTime())[0];
+
+  /** Labels of the parts of the form the host has already changed (for the overwrite warning). */
+  function filledFields() {
+    const changed = (k: keyof EventInput) => JSON.stringify(v[k] ?? null) !== JSON.stringify(initial[k] ?? null);
+    const fields: [string, boolean][] = [
+      ["title", changed("title")],
+      ["summary", changed("summary")],
+      ["description", changed("description")],
+      ["highlights", changed("highlights")],
+      ["category and cuisine", changed("category") || changed("cuisine") || changed("format")],
+      ["tags", tagText !== initial.tags.join(", ")],
+      ["dates and price", changed("sessions") || changed("ticketPriceDollars") || changed("durationMinutes")],
+      ["menu", (v.menuSections?.length ?? 0) > 0],
+      ["itinerary", (v.itinerary?.length ?? 0) > 0],
+    ];
+    return fields.filter(([, on]) => on).map(([label]) => label);
+  }
+
+  /** Prefills the form from a suggested concept. Venue, photos and policy are left to the host. */
+  function applyConcept(c: EventConcept) {
+    const target = DAY_KEYS.indexOf(c.day);
+    const from = addIsoDays(today, 14);
+    const date = addIsoDays(from, (target - isoWeekday(from) + 7) % 7);
+    setV((p) => ({
+      ...p,
+      title: c.title,
+      summary: c.summary,
+      description: c.description,
+      category: c.category,
+      cuisine: c.cuisine,
+      format: c.format,
+      occasions: c.occasions,
+      socialAtmosphere: c.socialAtmosphere,
+      durationMinutes: c.durationMinutes,
+      ticketPriceDollars: c.price.suggested,
+      sessions: [{ date, time: c.startTime, capacity: c.groupSize.max }],
+      menuSections: c.menuSections,
+      menuStatus: "SUBJECT_TO_CHANGE",
+      itinerary: c.itinerary,
+      featuredDishes: c.featuredDishes,
+    }));
+    setTagText(c.tags.join(", "));
+    setAiApplied(true);
+    setAiConfirmed(false);
+    setMessage(null);
+    setStep(0);
+  }
 
   function submit(intent: "draft" | "publish") {
     setMessage(null);
@@ -127,6 +190,33 @@ export function EventWizard({
 
   return (
     <div className="grid gap-8 lg:grid-cols-[13rem_1fr]">
+      {header && (
+        <div className="lg:col-span-2 [&>header]:mb-0">
+          <PageHeader
+            title={header.title}
+            description={header.description}
+            actions={
+              ai ? (
+                <AiEventAssistant
+                  context={ai.context}
+                  defaults={{ priceMin: Math.max(5, Math.round(v.ticketPriceDollars * 0.7)), priceMax: Math.round(v.ticketPriceDollars * 1.3), capacity: v.sessions[0]?.capacity ?? 12 }}
+                  filledFields={filledFields}
+                  onUse={applyConcept}
+                />
+              ) : undefined
+            }
+          />
+        </div>
+      )}
+      {aiApplied && (
+        <div role="status" className="flex items-start gap-3 rounded-2xl border border-brand/30 bg-brand/5 p-4 text-sm lg:col-span-2">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
+          <p>
+            <span className="font-medium">Filled in from a suggested concept (rule-based demo generator).</span> Every field stays editable. Steps marked &ldquo;Suggested&rdquo;
+            aren&apos;t confirmed yet: check the venue, date and time, ticket price, capacity, menu and cancellation policy before you publish. Nothing has been saved or published.
+          </p>
+        </div>
+      )}
       <ol className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1" aria-label="Steps">
         {STEPS.map((label, i) => (
           <li key={label} className="shrink-0">
@@ -143,6 +233,7 @@ export function EventWizard({
                 {i < step ? <Check className="size-3" aria-hidden /> : i + 1}
               </span>
               {label}
+              {aiApplied && SUGGESTED_STEPS.has(i) && <span className="ml-auto rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] text-brand">Suggested</span>}
             </button>
           </li>
         ))}
@@ -153,6 +244,11 @@ export function EventWizard({
           <h2 className="mb-6 text-2xl">
             <span className="sr-only">Step {step + 1} of {STEPS.length}: </span>
             {STEPS[step]}
+            {aiApplied && SUGGESTED_STEPS.has(step) && (
+              <span className="ml-3 inline-flex items-center gap-1 rounded-full bg-brand/10 px-2.5 py-1 align-middle font-sans text-xs text-brand">
+                <Sparkles className="size-3" aria-hidden /> Suggested, please confirm
+              </span>
+            )}
           </h2>
 
           {step === 0 && (
@@ -444,6 +540,14 @@ export function EventWizard({
                   </>
                 )}
               </section>
+              {aiApplied && (
+                <label className="flex items-start gap-3 rounded-xl border border-brand/30 bg-brand/5 p-4 text-sm">
+                  <input type="checkbox" checked={aiConfirmed} onChange={(e) => setAiConfirmed(e.target.checked)} className="mt-0.5 size-4 accent-[var(--brand)]" />
+                  <span>
+                    I&apos;ve confirmed the venue, date and time, ticket price, capacity, menu and cancellation policy myself. The suggested concept was only a starting point.
+                  </span>
+                </label>
+              )}
               {publishBlockers.length > 0 ? (
                 <div className="rounded-xl border border-dashed bg-muted/40 p-4 text-sm">
                   <p className="flex items-center gap-2 font-medium">

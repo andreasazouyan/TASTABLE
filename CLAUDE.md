@@ -105,6 +105,11 @@ tests/e2e            Playwright journeys against a production build and prisma/e
 - **Culinary Demand Insights** (`/host/insights`) renders `getAudienceInsights` (stated interest) beside
   `bookedByCategory` (actual bookings, kept separate). Labels and rule-based "Smart insights" live in
   `src/lib/analytics/demand-insights.ts`; every insight states its counts and fires only on visible buckets.
+- **AI-assisted Create Event**: no AI provider is configured, so "Let AI Create the Event" uses the
+  deterministic, rule-based generator in `src/lib/event-concepts/generate.ts` (aggregated demand only,
+  Zod-validated `eventConcept` output, labelled "Demo generator" in the UI; never claim a live model).
+  It only prefills the wizard: venue, photos and policy stay with the host, prefilled steps are marked
+  "Suggested", and publishing requires the host's explicit confirmation. AI never publishes.
 - **NYC locations**: one vocabulary in `src/lib/domain/neighborhoods.ts` (five `BOROUGHS`, ~150
   `NEIGHBORHOODS` with aliases for older spellings). Venues store the neighborhood/borough *name*;
   resolve with `neighborhoodForName` / `boroughKeyForName`. Discover's `borough` + `neighborhood`
