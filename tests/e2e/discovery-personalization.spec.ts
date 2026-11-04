@@ -44,7 +44,7 @@ test("host ratings match verified reviews on cards and event pages; hosts withou
   const label = `${Number(row.avg).toFixed(1)} (${row.n} reviews)`;
   await expect(page.getByRole("region", { name: "Your host" }).getByText(label)).toBeVisible();
   await page.goto("/discover");
-  const card = page.getByRole("article").filter({ has: page.getByRole("link", { name: "Italian Pasta-Making Workshop" }) });
+  const card = page.getByRole("article").filter({ has: page.getByRole("link", { name: "Italian Pasta-Making Workshop" }) }).first();
   await expect(card.getByText(label)).toBeVisible();
 
   // A host with no reviews shows empty stars and "New host".
@@ -63,12 +63,12 @@ test("Recommended for You explains itself and discovery stays complete", async (
   for (const why of await section.getByText(/^Why: /).allTextContents()) expect(why).not.toMatch(/\d+ ?min/);
 
   // Personal ordering never hides listings.
-  await page.goto("/discover");
+  await page.goto("/discover?sort=recommended");
   const results = page.getByRole("list", { name: "Results" }).getByRole("article");
   await expect(results.first()).toBeVisible();
   const personal = await results.count();
   await expect(page.getByText(/using your preferences to order results \(nothing is hidden\)/)).toBeVisible();
-  await page.goto("/discover?sort=soonest");
+  await page.goto("/discover?sort=price-asc");
   await expect(results.first()).toBeVisible();
   await expect(results).toHaveCount(personal);
 });

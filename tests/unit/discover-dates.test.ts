@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { nyDateTime } from "@/lib/clock";
 import { addIsoDays, dateWindow, whenDays } from "@/lib/discovery/dates";
 import { applyFilters, parseFilters } from "@/lib/discovery/filters";
+import { dayHeading, groupByDate } from "@/lib/discovery/grouping";
 import type { Listing, ListingSession } from "@/lib/discovery/types";
 
 const at = (iso: string, h = 12, m = 0) => nyDateTime(iso, h, m);
@@ -121,5 +122,40 @@ describe("applyFilters with When", () => {
   });
   it("ignores an invalid option", () => {
     expect(parseFilters({ when: "yesterday" }).when).toBeUndefined();
+  });
+});
+
+describe("Discover by date", () => {
+  const now = at("2026-11-03", 9, 0); // Tuesday morning
+  it("headings: Today, Tomorrow, then weekday names; year shown when it changes", () => {
+    expect(dayHeading("2026-11-03", now)).toBe("Today — November 3");
+    expect(dayHeading("2026-11-04", now)).toBe("Tomorrow — November 4");
+    expect(dayHeading("2026-11-05", now)).toBe("Thursday, November 5");
+    expect(dayHeading("2027-01-01", now)).toBe("Friday, January 1, 2027");
+    expect(dayHeading("2027-01-01", at("2026-12-31", 22))).toBe("Tomorrow — January 1, 2027");
+  });
+
+  it("lists an experience under each of its dates, in time order, only on days with sessions", () => {
+    const listings = [
+      listing("late-thursday", [session("a", at("2026-11-05", 21))]),
+      listing("multi", [session("b1", at("2026-11-05", 18)), session("b2", at("2026-11-07", 12)), session("b3", at("2026-11-07", 19))]),
+      listing("today", [session("c", at("2026-11-03", 19))]),
+    ];
+    const groups = groupByDate(applyFilters(listings, parseFilters({ sort: "soonest" }), now), now);
+    expect(groups.map((g) => [g.label, g.items.map((i) => i.slug)])).toEqual([
+      ["Today — November 3", ["today"]],
+      ["Thursday, November 5", ["multi", "late-thursday"]],
+      ["Saturday, November 7", ["multi"]],
+    ]);
+    const sat = groups[2].items[0];
+    expect(sat.matched!.id).toBe("b2");
+    expect(sat.matchedCount).toBe(2);
+    expect(groups[1].items[0].matched!.id).toBe("b1");
+  });
+
+  it("respects the other filters (only matching sessions get a date)", () => {
+    const listings = [listing("multi", [session("x", at("2026-11-05", 18), 4000), session("y", at("2026-11-06", 18), 9000)])];
+    const groups = groupByDate(applyFilters(listings, parseFilters({ maxPrice: "50" }), now), now);
+    expect(groups.map((g) => g.date)).toEqual(["2026-11-05"]);
   });
 });

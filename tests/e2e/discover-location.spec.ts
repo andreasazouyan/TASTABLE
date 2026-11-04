@@ -9,8 +9,9 @@ async function results(page: Page) {
   const list = page.getByRole("list", { name: "Results" });
   await expect(list.getByRole("article").first()).toBeVisible();
   const cards = await list.getByRole("article").allInnerTexts();
-  // The count shown matches the cards listed.
-  await expect(page.getByRole("heading", { name: new RegExp(`^${cards.length} experiences?$`) })).toBeVisible();
+  // The count shown is the number of distinct experiences listed (one can appear under several dates).
+  const distinct = await list.getByRole("article").evaluateAll((els) => new Set(els.map((e) => e.querySelector("h3")?.textContent)).size);
+  await expect(page.getByRole("heading", { name: new RegExp(`^${distinct} experiences?$`) })).toBeVisible();
   return cards;
 }
 const expectAllIn = (cards: string[], allowed: string[]) => {

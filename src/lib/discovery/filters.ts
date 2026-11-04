@@ -25,13 +25,15 @@ const categorySlugs = CATEGORIES.map((c) => c.slug);
 
 export const SORTS = [
   { key: "recommended", label: "Recommended" },
-  { key: "soonest", label: "Soonest" },
+  { key: "soonest", label: "Date: Soonest First" },
   { key: "price-asc", label: "Price: low to high" },
   { key: "price-desc", label: "Price: high to low" },
   { key: "spots", label: "Most spots left" },
   { key: "newest", label: "Newest" },
 ] as const;
 export type SortKey = (typeof SORTS)[number]["key"];
+/** Discover opens chronologically when no sort is chosen. */
+export const DEFAULT_DISCOVER_SORT: SortKey = "soonest";
 
 export const COLLECTIONS = [
   { key: "this-weekend", title: "This Weekend", blurb: "Friday to Sunday, with seats still open." },
@@ -180,7 +182,7 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
     if (!sessions.length) continue;
 
     const bookable = sessions.find((s) => isBookable({ ...s, seatsReserved: s.capacity - s.seatsLeft, status: "SCHEDULED" }, now));
-    out.push({ ...l, matched: bookable ?? sessions[0], matchedCount: sessions.length, distance });
+    out.push({ ...l, matched: bookable ?? sessions[0], matchedCount: sessions.length, matchedSessions: sessions, distance });
   }
 
   return sortListings(out, f.sort ?? (origin ? "recommended" : "recommended"));

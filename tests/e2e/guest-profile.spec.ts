@@ -39,7 +39,7 @@ test("profile: edit neighborhood, time slots, cuisine and dish; changes persist 
   await page.goto("/");
   await expect(page.getByRole("region", { name: "Picked for you, Jordan" }).getByText(/^Why: /).first()).toBeVisible();
   await expect(page.getByText(/favorite dishes: Pasta/)).toHaveCount(0);
-  await page.goto("/discover");
+  await page.goto("/discover?sort=recommended");
   const taco = page.getByRole("article").filter({ has: page.getByRole("link", { name: "One-Night Taco Pop-Up" }) });
   await expect(taco.getByText(/Featuring one of your favorite dishes: Tacos/)).toBeVisible();
 

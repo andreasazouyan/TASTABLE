@@ -108,7 +108,7 @@ test("public host profile: details, sortable reviews, past and upcoming events; 
 
 test("cards link host names to the host profile", async ({ page }) => {
   await page.goto("/discover");
-  const card = page.getByRole("article").filter({ has: page.getByRole("link", { name: "Italian Pasta-Making Workshop" }) });
+  const card = page.getByRole("article").filter({ has: page.getByRole("link", { name: "Italian Pasta-Making Workshop" }) }).first();
   await card.getByRole("link", { name: "Luca Moretti" }).click();
   await page.waitForURL(/\/hosts\/luca-moretti/);
 });

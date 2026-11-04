@@ -58,3 +58,36 @@ test("a shared ?date= link shows that day only, with Choose Dates active", async
   await expect(when.getByRole("radio", { name: "Choose Dates" })).toBeChecked();
   for (const text of await cardDates(page)) expect(text).toMatch(/Thu, Nov 5/);
 });
+
+test("Discover opens by date (Soonest First) with day headings; other sorts are one grid", async ({ page }) => {
+  await page.goto("/discover");
+  await expect(page.getByLabel("Sort")).toHaveValue("soonest");
+  await expect(page.getByLabel("Sort").locator("option:checked")).toHaveText("Date: Soonest First");
+  const results = page.getByRole("list", { name: "Results" });
+  const headings = await results.locator("h3[id^='day-']").allTextContents();
+  // Clock: Monday Nov 2; the sample data's first sessions are on Wednesday Nov 4.
+  expect(headings.slice(0, 3)).toEqual(["Wednesday, November 4", "Thursday, November 5", "Friday, November 6"]);
+  expect(new Set(headings).size).toBe(headings.length);
+
+  // An experience with sessions on several dates appears under each date.
+  const day = (label: string) => page.getByRole("region", { name: label });
+  const counts = await page.getByRole("link", { name: "Italian Pasta-Making Workshop" }).count();
+  expect(counts).toBeGreaterThan(1);
+  // Cards within a day are in time order.
+  const fri = await day("Friday, November 6").getByRole("article").allInnerTexts();
+  const times = fri.map((t) => t.match(/Fri, Nov 6, (\d+):(\d+) (AM|PM)/)!).map(([, h, m, ap]) => ((+h % 12) + (ap === "PM" ? 12 : 0)) * 60 + +m);
+  expect(times).toEqual([...times].sort((a, b) => a - b));
+
+  // Filters still apply inside the grouped view.
+  await page.goto("/discover?category=classes");
+  for (const text of await results.getByRole("article").allInnerTexts()) expect(text).toMatch(/CLASSES/i);
+  await expect(results.getByRole("heading", { level: 3 }).first()).toBeVisible();
+
+  // Another sort removes the date headings; choosing Soonest again brings them back.
+  await page.getByLabel("Sort").selectOption("price-asc");
+  await page.waitForURL(/sort=price-asc/);
+  await expect(results.getByRole("region")).toHaveCount(0);
+  await page.getByLabel("Sort").selectOption("soonest");
+  await page.waitForURL((u) => !u.search.includes("sort="));
+  await expect(results.getByRole("region").first()).toBeVisible();
+});

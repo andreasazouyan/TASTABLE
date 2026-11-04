@@ -44,4 +44,10 @@ export type Listing = {
 };
 
 /** A listing plus the session that matched the active filters (shown on the card). */
-export type ListingMatch = Listing & { matched: ListingSession | null; matchedCount: number; distance: number | null };
+export type ListingMatch = Listing & {
+  matched: ListingSession | null;
+  matchedCount: number;
+  distance: number | null;
+  /** Every upcoming session that satisfied the filters, in date order (for the by-date layout). */
+  matchedSessions?: ListingSession[];
+};
