@@ -1,7 +1,7 @@
 import { CalendarDays, MapPin, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
+import { NeighborhoodOptions } from "@/components/site/neighborhood-options";
 import { cn } from "@/lib/utils";
 
 /**
@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
  * and produces a shareable URL. No location permission is requested.
  */
 export function SearchBar({ className, defaultNear, defaultDate, minDate }: { className?: string; defaultNear?: string; defaultDate?: string; minDate?: string }) {
-  const boroughs = Array.from(new Set(NEIGHBORHOODS.map((n) => n.borough)));
   return (
     <form
       action="/discover"
@@ -30,15 +29,7 @@ export function SearchBar({ className, defaultNear, defaultDate, minDate }: { cl
             className="-ml-1 w-full cursor-pointer truncate bg-transparent text-sm text-muted-foreground outline-none"
           >
             <option value="">Anywhere in NYC</option>
-            {boroughs.map((b) => (
-              <optgroup key={b} label={b}>
-                {NEIGHBORHOODS.filter((n) => n.borough === b).map((n) => (
-                  <option key={n.key} value={n.key}>
-                    {n.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
+            <NeighborhoodOptions />
           </select>
         </span>
       </label>

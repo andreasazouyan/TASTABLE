@@ -80,8 +80,15 @@ tests/e2e            Playwright journeys against a production build and prisma/e
 - **Capacity lives on `ExperienceSession`** (`capacity`, `seatsReserved`). Bookings reserve seats with
   an atomic conditional `UPDATE` inside the transaction. Never show a session with 0 seats as
   available (`src/lib/booking/capacity.ts`).
-- **Refunds** are computed by `computeRefund()` from the event's `CancellationPolicy` and shown before
-  confirming. Cancellation is idempotent (conditional status transition).
+- **Refunds** are computed by `quoteCancellation()` (`src/lib/booking/cancellation.ts`) from the terms
+  snapshotted on the booking (`policySnapshot`), never the event's current policy, and shown before
+  confirming. New bookings accept the platform policy `LATE_FEE_24H_25`: free until 24h before (exactly
+  24h is on time), then a 25% fee on the ticket subtotal (not the service fee), kept from what was paid.
+  Older bookings keep their tiered terms. Cancellation is idempotent (conditional status transition) and
+  records `cancellationFeeCents`, which host finances keep.
+- **Reminders** are in-app only (`BookingReminder`, 24h before; `src/server/services/reminders.ts`),
+  moved on reschedule and cancelled with the booking. Booking .ics files carry a 24h VALARM. Never claim
+  an email or push reminder was sent.
 - **Authorization**: every host mutation goes through `assertOwnsExperience`. Guests only see their own
   bookings. Shared calendars expose event-level data only, behind non-guessable, revocable tokens.
 - **Venues**: never claim Tastable secured a venue. "Venue to be confirmed" events stay drafts.
@@ -95,12 +102,34 @@ tests/e2e            Playwright journeys against a production build and prisma/e
 - **Host audience insights** (`src/server/queries/audience-insights.ts`) aggregate in SQL and
   apply `src/lib/analytics/privacy.ts` thresholds (segment >= 10, bucket >= 5). Never return
   per-guest rows or identities to hosts.
+- **Culinary Demand Insights** (`/host/insights`) renders `getAudienceInsights` (stated interest) beside
+  `bookedByCategory` (actual bookings, kept separate). Labels and rule-based "Smart insights" live in
+  `src/lib/analytics/demand-insights.ts`; every insight states its counts and fires only on visible buckets.
+- **AI-assisted Create Event**: no AI provider is configured, so "Let AI Create the Event" uses the
+  deterministic, rule-based generator in `src/lib/event-concepts/generate.ts` (aggregated demand only,
+  Zod-validated `eventConcept` output, labelled "Demo generator" in the UI; never claim a live model).
+  It only prefills the wizard: venue, photos and policy stay with the host, prefilled steps are marked
+  "Suggested", and publishing requires the host's explicit confirmation. AI never publishes.
+- **NYC locations**: one vocabulary in `src/lib/domain/neighborhoods.ts` (five `BOROUGHS`, ~150
+  `NEIGHBORHOODS` with aliases for older spellings). Venues store the neighborhood/borough *name*;
+  resolve with `neighborhoodForName` / `boroughKeyForName`. Discover's `borough` + `neighborhood`
+  params (`src/lib/discovery/location.ts`): a borough with no neighborhoods ticked means the whole
+  borough. Discover's `when` param (`src/lib/discovery/dates.ts`) resolves quick dates in New York time.
 - **Saves**: `Experience.saveCount` = unique savers, changed only via `src/server/services/saved.ts`.
 - **Reviews**: one per booking/session, verified by a checked-in ticket, relationships derived from
   the booking (`src/server/services/reviews.ts`). One rating calculation: `ratingSummary` in
-  `src/lib/reviews.ts`. Reports never hide a review automatically.
+  `src/lib/reviews.ts`. Reports never hide a review automatically (UNDER_REVIEW stays public and
+  counted; only `moderateReview` "remove" hides one). Guests leave/edit reviews at
+  `/bookings/[reference]/review`; public reviews show first names only. Public host profiles live
+  at `/hosts/[slug]` (`src/server/queries/host-profile.ts`).
 - **Event content**: structured menu sections, itinerary (minutes from start) and featured dishes;
-  the legacy `Experience.menu` JSON is kept in sync by `saveEvent`.
+  the legacy `Experience.menu` JSON is kept in sync by `saveEvent`. Guests see them through
+  `EventMenu` ("The Menu" / "What You'll Cook" / "What You'll Enjoy", menu status) and
+  `ExperienceTimeline` ("Your Experience", New York time); the host wizard previews the same components.
+- **Event images**: Tastable's own images live in `public/tastable-event-images` and are matched to
+  sample events by filename in `src/lib/domain/event-images.ts` (cover photo; Unsplash placeholders
+  fill the rest). `scripts/apply-event-images.ts` adds them to already-seeded databases (additive,
+  idempotent, fictional events only; runs in `vercel-build`).
 - **Migrations are additive only** (no drops/renames/deletes, no invented backfills). Run
   `npm run db:check` for read-only integrity checks.
 - Money is stored in integer cents. Platform fee 10% of net ticket revenue; guest service fee 6% capped at $25.

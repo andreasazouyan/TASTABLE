@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { requireGuest } from "@/lib/auth/demo";
 import { availability, seatsLeft } from "@/lib/booking/capacity";
 import { sessionUnitPrice } from "@/lib/booking/pricing";
-import { describePolicy } from "@/lib/booking/refunds";
+import { describeTerms, STANDARD_LATE_FEE_TERMS } from "@/lib/booking/cancellation";
 import { db } from "@/lib/db";
 import { parseList } from "@/lib/domain/lists";
 import { dietaryLabel } from "@/lib/domain/taxonomy";
@@ -71,8 +71,8 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
           sessionId={session.id}
           unitPriceCents={sessionUnitPrice(session, exp)}
           seatsLeft={left}
-          policyName={exp.cancellationPolicy.name}
-          policyLines={describePolicy(exp.cancellationPolicy)}
+          policyName={STANDARD_LATE_FEE_TERMS.name}
+          policyLines={describeTerms(STANDARD_LATE_FEE_TERMS)}
           defaultName={user.name}
           defaultEmail={user.email}
           dietaryOptions={parseList(exp.dietaryOptions).map(dietaryLabel)}

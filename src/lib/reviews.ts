@@ -95,8 +95,8 @@ export function ratingLabel(s: Pick<RatingSummary, "average" | "count">) {
 export type ReviewSort = "recent" | "highest" | "lowest";
 export const REVIEW_SORTS: { key: ReviewSort; label: string }[] = [
   { key: "recent", label: "Most Recent" },
-  { key: "highest", label: "Highest Rated" },
-  { key: "lowest", label: "Lowest Rated" },
+  { key: "highest", label: "Highest" },
+  { key: "lowest", label: "Lowest" },
 ];
 export function reviewOrderBy(sort: ReviewSort) {
   if (sort === "highest") return [{ rating: "desc" as const }, { createdAt: "desc" as const }];

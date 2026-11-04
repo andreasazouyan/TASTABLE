@@ -5,7 +5,9 @@
  */
 import type { PrismaClient } from "../src/generated/prisma/client";
 import { normalizeDishList } from "../src/lib/domain/dishes";
-import { sectionsFromLegacyMenu } from "../src/lib/domain/event-content";
+import { legacyMenuFromSections, sectionsFromLegacyMenu, type MenuSectionInput } from "../src/lib/domain/event-content";
+import { PHOTOS } from "../src/lib/domain/photos";
+import { SEED_MENUS } from "./seed-menus";
 import { DAYS, overlappingSlots } from "../src/lib/domain/preferences";
 import { NEIGHBORHOODS } from "../src/lib/domain/neighborhoods";
 import { nyWeekdayHour } from "../src/lib/clock";
@@ -94,11 +96,34 @@ export async function seedFoundation(db: PrismaClient, now: Date) {
   for (const e of exps) {
     const dishes = normalizeDishList((FEATURED_DISHES[e.slug] ?? []).map((key) => ({ key })));
     if (dishes.length) await db.experienceDish.createMany({ data: dishes.map((d, i) => ({ experienceId: e.id, dishKey: d.dishKey, sortOrder: i })) });
-    const sections = sectionsFromLegacyMenu(JSON.parse(e.menu));
+    const seedMenu = SEED_MENUS[e.slug];
+    const sections: MenuSectionInput[] = seedMenu
+      ? seedMenu.sections.map((s) => ({ title: s.title, description: s.description ?? "", items: s.items.map((it) => ({ name: it.name, description: it.description ?? "", dietaryTags: it.dietary ?? [], dish: it.dish, ...(it.photo ? { imageUrl: PHOTOS[it.photo].src, imageAlt: PHOTOS[it.photo].alt } : {}) })) }))
+      : sectionsFromLegacyMenu(JSON.parse(e.menu));
     for (const [i, s] of sections.entries()) {
       await db.experienceMenuSection.create({
-        data: { experienceId: e.id, title: s.title, sortOrder: i, items: { create: s.items.map((item, j) => ({ name: item.name, description: item.description, sortOrder: j })) } },
+        data: {
+          experienceId: e.id,
+          title: s.title,
+          description: s.description,
+          sortOrder: i,
+          items: {
+            create: s.items.map((item, j) => ({
+              name: item.name,
+              description: item.description,
+              dishKey: item.dish ?? null,
+              dietaryTags: item.dietaryTags.join(","),
+              imageUrl: item.imageUrl ?? null,
+              imageAlt: item.imageAlt ?? null,
+              sortOrder: j,
+            })),
+          },
+        },
       });
+    }
+    if (seedMenu) {
+      // Keep the legacy flat menu in sync, exactly as saveEvent does.
+      await db.experience.update({ where: { id: e.id }, data: { menu: JSON.stringify(legacyMenuFromSections(sections)), menuStatus: seedMenu.status ?? "FINAL" } });
     }
     await db.experienceItineraryStep.createMany({ data: itineraryFor(e.format, e.durationMinutes).map((s) => ({ ...s, experienceId: e.id })) });
   }

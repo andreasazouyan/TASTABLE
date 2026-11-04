@@ -11,10 +11,11 @@ import { EmptyState } from "@/components/site/empty-state";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/demo";
 import { CATEGORIES } from "@/lib/domain/categories";
-import { getNeighborhood } from "@/lib/domain/neighborhoods";
+import { boroughKeyOf, getBorough, getNeighborhood } from "@/lib/domain/neighborhoods";
 import { cuisineLabel, FORMATS, HOST_TYPES, occasionLabel } from "@/lib/domain/taxonomy";
 import {
   COLLECTIONS,
+  DEFAULT_DISCOVER_SORT,
   SORTS,
   activeFilterCount,
   applyFilters,
@@ -22,11 +23,15 @@ import {
   parseFilters,
   type DiscoveryFilters,
 } from "@/lib/discovery/filters";
+import { WHEN_OPTIONS } from "@/lib/discovery/dates";
+import { groupByDate } from "@/lib/discovery/grouping";
+import { resolveLocation } from "@/lib/discovery/location";
 import { formatDate } from "@/lib/format";
 import { nyDateTime } from "@/lib/clock";
 import { requestNow } from "@/lib/request-clock";
 import { getSavedIds } from "@/server/queries/guest";
 import { getListings } from "@/server/queries/listings";
+import { personalizeResults } from "@/server/queries/recommendations";
 import { DiscoverSkeleton } from "./skeleton";
 
 export const metadata: Metadata = { title: "Discover" };
@@ -49,12 +54,26 @@ function chipsFor(f: DiscoveryFilters): Chip[] {
   const chips: Chip[] = [];
   if (f.collection) chips.push({ label: COLLECTIONS.find((c) => c.key === f.collection)!.title, href: without({ collection: undefined }) });
   if (f.q) chips.push({ label: `“${f.q}”`, href: without({ q: undefined }) });
-  if (f.near) chips.push({ label: getNeighborhood(f.near)!.name, href: without({ near: undefined, within: undefined }) });
+  const { wholeBoroughs } = resolveLocation(f.borough, f.neighborhood);
+  for (const b of wholeBoroughs) chips.push({ label: getBorough(b)!.name, href: without({ borough: f.borough.filter((x) => x !== b) }) });
+  for (const k of f.neighborhood) {
+    const n = getNeighborhood(k)!;
+    chips.push({ label: n.name, href: without({ neighborhood: f.neighborhood.filter((x) => x !== k), borough: f.borough.filter((x) => x !== boroughKeyOf(n) || f.neighborhood.some((y) => y !== k && boroughKeyOf(getNeighborhood(y)!) === x)) }) });
+  }
+  if (f.near) chips.push({ label: `Near ${getNeighborhood(f.near)!.name}`, href: without({ near: undefined, within: undefined }) });
   if (f.near && f.within) chips.push({ label: `Within ${f.within} mi`, href: without({ within: undefined }) });
   const dateLabel = (iso: string) => formatDate(nyDateTime(iso, 12), { month: "short", day: "numeric" });
-  if (f.date) chips.push({ label: dateLabel(f.date), href: without({ date: undefined }) });
-  if (f.from) chips.push({ label: `From ${dateLabel(f.from)}`, href: without({ from: undefined }) });
-  if (f.to) chips.push({ label: `Until ${dateLabel(f.to)}`, href: without({ to: undefined }) });
+  const noDates = { when: undefined, date: undefined, from: undefined, to: undefined };
+  if (f.when && f.when !== "custom") chips.push({ label: WHEN_OPTIONS.find((o) => o.key === f.when)!.label, href: without(noDates) });
+  else if (f.when === "custom") {
+    const first = f.from ?? f.to ?? f.date;
+    const last = f.from && f.to && f.to > f.from ? f.to : null;
+    if (first) chips.push({ label: last ? `${dateLabel(first)} – ${dateLabel(last)}` : dateLabel(first), href: without(noDates) });
+  } else {
+    if (f.date) chips.push({ label: dateLabel(f.date), href: without({ date: undefined }) });
+    if (f.from) chips.push({ label: `From ${dateLabel(f.from)}`, href: without({ from: undefined }) });
+    if (f.to) chips.push({ label: `Until ${dateLabel(f.to)}`, href: without({ to: undefined }) });
+  }
   for (const slug of f.category)
     chips.push({ label: CATEGORIES.find((c) => c.slug === slug)!.shortName, href: without({ category: f.category.filter((x) => x !== slug) }) });
   for (const k of f.cuisine) chips.push({ label: cuisineLabel(k), href: without({ cuisine: f.cuisine.filter((x) => x !== k) }) });
@@ -72,7 +91,15 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
   const now = await requestNow();
   const [listings, user] = await Promise.all([getListings(now.toISOString()), getCurrentUser()]);
   const saved = await getSavedIds(user?.guestProfile?.id);
-  const results = applyFilters(listings, filters, now);
+  // Discover opens chronologically ("Date: Soonest First"), grouped by day; other sorts stay one grid.
+  const sort = filters.sort ?? DEFAULT_DISCOVER_SORT;
+  const filtered = applyFilters(listings, { ...filters, sort }, now);
+  // "Recommended" sort is personal for guests with preferences: same results, ordered by fit.
+  const prefs = user?.guestProfile?.preferences;
+  const personal = sort === "recommended" && prefs?.onboardingCompletedAt ? await personalizeResults(prefs, filtered) : null;
+  const results = personal ? personal.map((p) => p.listing) : filtered;
+  const reasons = new Map((personal ?? []).filter((p) => p.reason).map((p) => [p.listing.id, p.reason!]));
+  const groups = sort === "soonest" ? groupByDate(results, now) : null;
   const chips = chipsFor(filters);
   const count = activeFilterCount(filters);
   const collection = COLLECTIONS.find((c) => c.key === filters.collection);
@@ -104,7 +131,7 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
                 {results.length} {results.length === 1 ? "experience" : "experiences"}
               </h2>
             </div>
-            <SortSelect value={filters.sort ?? "recommended"} />
+            <SortSelect value={sort} defaultValue={DEFAULT_DISCOVER_SORT} />
           </div>
 
           {chips.length > 0 && (
@@ -138,21 +165,47 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
               <Button asChild>
                 <Link href="/discover">Clear all filters</Link>
               </Button>
-              <Button asChild variant="outline">
-                <Link href="/discover?collection=this-weekend">See this weekend</Link>
-              </Button>
+              {filters.borough.length + filters.neighborhood.length > 0 ? (
+                <Button asChild variant="outline">
+                  <Link href={`/discover?${filtersToQuery({ ...filters, borough: [], neighborhood: [] })}`}>Search all of NYC</Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline">
+                  <Link href="/discover?collection=this-weekend">See this weekend</Link>
+                </Button>
+              )}
             </EmptyState>
+          ) : groups ? (
+            <ul className="space-y-12" aria-label="Results">
+              {groups.map((g, gi) => (
+                <li key={g.date}>
+                  <section aria-labelledby={`day-${g.date}`}>
+                    <h3 id={`day-${g.date}`} className="mb-5 border-b pb-3 text-2xl">
+                      {g.label}
+                    </h3>
+                    <ul className="grid gap-x-5 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
+                      {g.items.map((l, i) => (
+                        <li key={`${l.id}-${g.date}`}>
+                          <ExperienceCard listing={l} saved={saved.has(l.id)} priority={gi === 0 && i < 3} />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                </li>
+              ))}
+            </ul>
           ) : (
             <ul className="grid gap-x-5 gap-y-10 sm:grid-cols-2 xl:grid-cols-3" aria-label="Results">
               {results.map((l, i) => (
                 <li key={l.id}>
-                  <ExperienceCard listing={l} saved={saved.has(l.id)} priority={i < 3} />
+                  <ExperienceCard listing={l} saved={saved.has(l.id)} priority={i < 3} reason={reasons.get(l.id)} />
                 </li>
               ))}
             </ul>
           )}
           <p className="mt-10 text-xs text-muted-foreground">
-            Sorted by {SORTS.find((s) => s.key === (filters.sort ?? "recommended"))!.label.toLowerCase()}. All listings are fictional samples.
+            Sorted by {SORTS.find((s) => s.key === sort)!.label.toLowerCase()}
+            {personal ? ", using your preferences to order results (nothing is hidden)" : ""}. All listings are fictional samples.
           </p>
         </section>
       </div>

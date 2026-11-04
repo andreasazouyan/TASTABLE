@@ -9,6 +9,8 @@ import "dotenv/config";
 
 import { Client } from "pg";
 
+import { boroughKeyForName, boroughKeyOf, neighborhoodForName } from "../src/lib/domain/neighborhoods";
+
 const CHECKS: { name: string; sql: string }[] = [
   {
     name: "Experience.saveCount matches unique savers",
@@ -69,6 +71,16 @@ async function main() {
       if (rows.length) failed++;
       console.log(`${rows.length ? "FAIL" : "ok  "}  ${check.name}${rows.length ? ` (${rows.length} rows, e.g. ${JSON.stringify(rows[0])})` : ""}`);
     }
+    // One location vocabulary: every real venue resolves to a known neighborhood in its own borough.
+    const { rows: venues } = await client.query<{ id: string; neighborhood: string; borough: string }>(
+      `SELECT id, neighborhood, borough FROM "Venue" WHERE NOT "isPlaceholder"`,
+    );
+    const bad = venues.filter((v) => {
+      const n = neighborhoodForName(v.neighborhood);
+      return !n || (v.borough && boroughKeyForName(v.borough) !== boroughKeyOf(n));
+    });
+    if (bad.length) failed++;
+    console.log(`${bad.length ? "FAIL" : "ok  "}  Venue neighborhoods and boroughs use the shared NYC list${bad.length ? ` (${bad.length} rows, e.g. ${JSON.stringify(bad[0])})` : ""}`);
   } finally {
     await client.end();
   }

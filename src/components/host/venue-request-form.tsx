@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { Field, inputClass } from "@/components/host/field";
 import { Button } from "@/components/ui/button";
-import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
+import { BOROUGHS, neighborhoodsIn } from "@/lib/domain/neighborhoods";
 import { cn } from "@/lib/utils";
 import { venueRequestAction, type FormState } from "@/server/actions/host";
 
@@ -16,20 +17,37 @@ export function VenueRequestForm() {
     <form action={action} className="space-y-6 rounded-2xl border bg-card p-5 shadow-soft sm:p-8">
       <fieldset>
         <legend className="mb-3 font-medium">Preferred neighborhoods</legend>
-        <div className="flex flex-wrap gap-2">
-          {NEIGHBORHOODS.map((n) => {
-            const on = hoods.includes(n.key);
+        <div className="space-y-2">
+          {BOROUGHS.map((b, i) => {
+            const list = neighborhoodsIn(b.key);
+            const count = list.filter((n) => hoods.includes(n.key)).length;
             return (
-              <label
-                key={n.key}
-                className={cn(
-                  "cursor-pointer rounded-full border px-3.5 py-1.5 text-sm transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/40",
-                  on ? "border-foreground bg-foreground text-background" : "bg-card hover:border-foreground/40",
-                )}
-              >
-                <input type="checkbox" name="neighborhoods" value={n.key} checked={on} onChange={() => setHoods(on ? hoods.filter((h) => h !== n.key) : [...hoods, n.key])} className="sr-only" />
-                {n.name}
-              </label>
+              <details key={b.key} open={i === 0} className="group rounded-xl border">
+                <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2.5 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                  <span>
+                    {b.name}
+                    {count > 0 && <span className="ml-1.5 font-normal text-muted-foreground">{count} selected</span>}
+                  </span>
+                  <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+                </summary>
+                <div className="flex flex-wrap gap-2 border-t p-3">
+                  {list.map((n) => {
+                    const on = hoods.includes(n.key);
+                    return (
+                      <label
+                        key={n.key}
+                        className={cn(
+                          "cursor-pointer rounded-full border px-3.5 py-1.5 text-sm transition-colors has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/40",
+                          on ? "border-foreground bg-foreground text-background" : "bg-card hover:border-foreground/40",
+                        )}
+                      >
+                        <input type="checkbox" name="neighborhoods" value={n.key} checked={on} onChange={() => setHoods(on ? hoods.filter((h) => h !== n.key) : [...hoods, n.key])} className="sr-only" />
+                        {n.name}
+                      </label>
+                    );
+                  })}
+                </div>
+              </details>
             );
           })}
         </div>

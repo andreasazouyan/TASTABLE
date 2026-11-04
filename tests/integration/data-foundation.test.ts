@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MIN_BUCKET_SIZE } from "@/lib/analytics/privacy";
+import { legacyMenuFromSections } from "@/lib/domain/event-content";
 import { serverNow } from "@/lib/clock";
 import { db } from "@/lib/db";
 import { getAudienceInsights, getEventCreationContext } from "@/server/queries/audience-insights";
@@ -18,10 +19,18 @@ describe("seeded foundation data", () => {
   it("backfills structured content, policy versions and save counters", async () => {
     const pasta = await db.experience.findUniqueOrThrow({
       where: { slug: "italian-pasta-making-workshop" },
-      include: { featuredDishes: true, itinerary: { orderBy: { sortOrder: "asc" } }, menuSections: { include: { items: true } }, _count: { select: { saved: true } } },
+      include: {
+        featuredDishes: true,
+        itinerary: { orderBy: { sortOrder: "asc" } },
+        menuSections: { orderBy: { sortOrder: "asc" }, include: { items: { orderBy: { sortOrder: "asc" } } } },
+        _count: { select: { saved: true } },
+      },
     });
     expect(pasta.featuredDishes.map((d) => d.dishKey)).toContain("pasta");
-    expect(pasta.menuSections[0].items.length).toBe(JSON.parse(pasta.menu).length);
+    // The legacy flat menu is derived from the structured sections (same rule as saveEvent).
+    const sections = pasta.menuSections.map((sec) => ({ title: sec.title, description: sec.description, items: sec.items.map((i) => ({ name: i.name, description: i.description, dietaryTags: [] })) }));
+    expect(JSON.parse(pasta.menu)).toEqual(legacyMenuFromSections(sections));
+    expect(pasta.menuSections.length).toBeGreaterThan(1);
     expect(pasta.itinerary[0].startOffsetMinutes).toBe(0);
     expect(pasta.saveCount).toBe(pasta._count.saved);
     expect(await db.booking.count({ where: { cancellationPolicyVersion: null } })).toBe(0);
@@ -168,5 +177,44 @@ describe("audience insights (aggregated, privacy-safe)", () => {
     expect(narrowed.eligibleGuests).toBe(all.eligibleGuests);
     const ctx = await getEventCreationContext();
     expect(ctx.topCuisines.length).toBeGreaterThan(0);
+  });
+});
+
+describe("profile edits flow into aggregated insights", () => {
+  it("changing neighborhood, slot, cuisine and dish moves the guest without double counting", async () => {
+    const guests = ["gst_bg-0", "gst_bg-1", "gst_bg-2", "gst_bg-4", "gst_bg-5"];
+    const bucket = async (dim: "neighborhood" | "time" | "cuisine" | "dish", key: string) =>
+      (await getAudienceInsights()).breakdowns![dim].buckets.find((b) => b.key === key)?.guests ?? 0;
+    const before = { hood: await bucket("neighborhood", "upper-west-side"), slot: await bucket("time", "14-16"), thai: await bucket("cuisine", "thai") };
+    const eligible = (await getAudienceInsights()).eligibleGuests;
+    for (const g of guests) {
+      await saveGuestPreferences(db, g, { locationKey: "upper-west-side", preferredTimes: ["14-16"], cuisines: ["thai"], favoriteDishes: [{ key: "pho" }] }, now, { complete: true });
+    }
+    expect(await bucket("neighborhood", "upper-west-side")).toBe(before.hood + guests.length);
+    expect(await bucket("time", "14-16")).toBe(before.slot + guests.length);
+    expect(await bucket("cuisine", "thai")).toBe(before.thai + guests.length);
+    expect(await bucket("dish", "pho")).toBeGreaterThanOrEqual(guests.length);
+    expect((await getAudienceInsights()).eligibleGuests).toBe(eligible);
+  });
+});
+
+describe("public host profile", () => {
+  it("shows rating, sorted reviews, past and upcoming events without exposing guest identities", async () => {
+    const { getPublicHostProfile } = await import("@/server/queries/host-profile");
+    const highest = await getPublicHostProfile("luca-moretti", now, "highest");
+    const lowest = await getPublicHostProfile("luca-moretti", now, "lowest");
+    expect(highest).not.toBeNull();
+    const ratings = highest!.reviews.map((r) => r.rating);
+    expect(ratings).toEqual([...ratings].sort((a, b) => b - a));
+    expect(lowest!.reviews.map((r) => r.rating)).toEqual([...ratings].sort((a, b) => a - b));
+    expect(highest!.rating.count).toBe(highest!.reviews.length);
+    for (const r of highest!.reviews) {
+      expect(Object.keys(r)).not.toContain("guestId");
+      expect(Object.keys(r)).not.toContain("guest");
+      expect(r.reviewerFirstName).not.toContain(" ");
+    }
+    expect(highest!.upcoming.every((l) => l.host.slug === "luca-moretti")).toBe(true);
+    expect(highest!.past.every((e) => e.sessions.every((s) => s.startsAt < now))).toBe(true);
+    expect(await getPublicHostProfile("no-such-host", now, "recent")).toBeNull();
   });
 });

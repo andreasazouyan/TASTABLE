@@ -4,8 +4,8 @@ import { Suspense } from "react";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireGuest } from "@/lib/auth/demo";
-import { db } from "@/lib/db";
-import { toPrefsValue } from "@/server/queries/preferences";
+import { toPrefsValue } from "@/lib/domain/preferences-value";
+import { getGuestPreferences } from "@/server/queries/preferences";
 
 export const metadata: Metadata = { title: "Personalise Tastable" };
 
@@ -22,7 +22,7 @@ export default function OnboardingPage(props: PageProps<"/onboarding">) {
 async function Onboarding({ searchParams }: PageProps<"/onboarding">) {
   const sp = await searchParams;
   const { guest } = await requireGuest("/onboarding");
-  const prefs = await db.guestPreferences.findUnique({ where: { guestProfileId: guest.id } });
+  const prefs = await getGuestPreferences(guest.id);
   const step = Number(typeof sp.step === "string" ? sp.step : "1") - 1;
   return <OnboardingWizard initial={toPrefsValue(prefs)} initialStep={Number.isFinite(step) ? step : 0} />;
 }

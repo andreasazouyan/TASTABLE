@@ -42,6 +42,72 @@ async function draft(over: Partial<EventInput> = {}): Promise<EventInput> {
 }
 
 describe("host events", () => {
+  it("rescheduling a booked date moves the guest's 24-hour reminder; cancelling the event cancels it", async () => {
+    const exp = await saveEvent(db, MAYA, await draft({ intent: "publish" }), now);
+    const session = await db.experienceSession.findFirstOrThrow({ where: { experienceId: exp.id } });
+    const booking = await createBooking(db, { guestId: "gst_zoe", sessionId: session.id, ticketCount: 1, contactName: "Zoe", contactEmail: "zoe@example.com", acknowledgedPolicy: true }, now);
+    await db.bookingReminder.update({ where: { bookingId: booking.id }, data: { status: "DISMISSED", dismissedAt: now } });
+
+    const newDate = isoDateNY(addDays(now, 12));
+    await saveEvent(db, MAYA, await draft({ intent: "publish", sessions: [{ id: session.id, date: newDate, time: "20:00", capacity: 10 }] }), now, exp.id);
+    const moved = await db.experienceSession.findUniqueOrThrow({ where: { id: session.id } });
+    const reminder = await db.bookingReminder.findUniqueOrThrow({ where: { bookingId: booking.id } });
+    expect(reminder.remindAt.getTime()).toBe(moved.startsAt.getTime() - 24 * 3_600_000);
+    expect(reminder.status).toBe("SCHEDULED");
+
+    await cancelEvent(db, MAYA, exp.id, now);
+    expect((await db.bookingReminder.findUniqueOrThrow({ where: { bookingId: booking.id } })).status).toBe("CANCELLED");
+    expect((await db.booking.findUniqueOrThrow({ where: { id: booking.id } })).refundAmountCents).toBe(booking.totalPriceCents);
+  });
+
+  it("saves structured menus, menu status, featured dishes and itinerary; keeps the legacy menu in sync", async () => {
+    const menuSections = [
+      { title: "Main", description: "", items: [{ name: "Shoyu ramen", description: "Chicken and dashi", dietaryTags: ["dairy-free"] }, { name: "Mushroom ramen", description: "", dietaryTags: ["vegan"], imageUrl: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624", imageAlt: "Ramen" }] },
+      { title: "Dessert", description: "", items: [{ name: "Black sesame ice cream", description: "", dietaryTags: ["vegetarian"] }] },
+    ];
+    const itinerary = [
+      { startOffsetMinutes: 0, endOffsetMinutes: 20, title: "Welcome", description: "" },
+      { startOffsetMinutes: 20, endOffsetMinutes: 100, title: "Ramen", description: "" },
+      { startOffsetMinutes: 100, endOffsetMinutes: null, title: "Dessert", description: "" },
+    ];
+    const exp = await saveEvent(db, MAYA, await draft({ menuSections, menuStatus: "SUBJECT_TO_CHANGE", itinerary, featuredDishes: ["Ramen", "Ice cream"], intent: "publish" }), now);
+    const saved = await db.experience.findUniqueOrThrow({
+      where: { id: exp.id },
+      include: { menuSections: { orderBy: { sortOrder: "asc" }, include: { items: { orderBy: { sortOrder: "asc" } } } }, itinerary: { orderBy: { sortOrder: "asc" } }, featuredDishes: { orderBy: { sortOrder: "asc" } } },
+    });
+    expect(saved.menuStatus).toBe("SUBJECT_TO_CHANGE");
+    expect(saved.menuSections.map((x) => x.title)).toEqual(["Main", "Dessert"]);
+    expect(saved.menuSections[0].items.map((i) => [i.name, i.dietaryTags])).toEqual([["Shoyu ramen", "dairy-free"], ["Mushroom ramen", "vegan"]]);
+    expect(saved.menuSections[0].items[1].imageUrl).toContain("unsplash");
+    expect(JSON.parse(saved.menu)).toEqual([
+      { title: "Main: Shoyu ramen", description: "Chicken and dashi" },
+      { title: "Main: Mushroom ramen", description: "" },
+      { title: "Dessert: Black sesame ice cream", description: "" },
+    ]);
+    expect(saved.itinerary.map((x) => [x.startOffsetMinutes, x.durationMinutes])).toEqual([[0, 20], [20, 80], [100, null]]);
+    expect(saved.featuredDishes.map((d) => d.dishKey)).toEqual(["ramen", "ice-cream"]);
+
+    // Reordering and removing on edit replaces the content in the new order.
+    await saveEvent(db, MAYA, await draft({ menuSections: [menuSections[1], { ...menuSections[0], items: [menuSections[0].items[1]] }], itinerary: itinerary.slice(0, 2) }), now, exp.id);
+    const edited = await db.experience.findUniqueOrThrow({ where: { id: exp.id }, include: { menuSections: { orderBy: { sortOrder: "asc" }, include: { items: true } }, itinerary: true } });
+    expect(edited.menuSections.map((x) => [x.title, x.items.length])).toEqual([["Dessert", 1], ["Main", 1]]);
+    expect(edited.itinerary).toHaveLength(2);
+  });
+
+  it("rejects an itinerary out of order and blocks publishing one that runs past the end", async () => {
+    await expect(
+      draft({ itinerary: [{ startOffsetMinutes: 30, endOffsetMinutes: null, title: "B", description: "" }, { startOffsetMinutes: 0, endOffsetMinutes: null, title: "A", description: "" }] }),
+    ).rejects.toThrow(/starts before step 1/);
+    await expect(
+      saveEvent(db, MAYA, await draft({ itinerary: [{ startOffsetMinutes: 0, endOffsetMinutes: 150, title: "Too long", description: "" }], intent: "publish" }), now),
+    ).rejects.toThrow(/runs past the end/);
+  });
+
+  it("allows publishing with the menu to be announced", async () => {
+    const exp = await saveEvent(db, MAYA, await draft({ menu: [], menuSections: [], menuStatus: "TO_BE_ANNOUNCED", intent: "publish" }), now);
+    expect(exp.status).toBe("PUBLISHED");
+  });
+
   it("saves a draft that is not visible in discovery, then publishes it", async () => {
     const exp = await saveEvent(db, MAYA, await draft(), now);
     expect(exp.status).toBe("DRAFT");

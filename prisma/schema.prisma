@@ -393,6 +393,9 @@ model CancellationPolicy {
   partialRefundPercent Int          @default(0)
   /// Bumped whenever the refund terms change. Bookings record the version they accepted.
   version              Int          @default(1)
+  /// Late-fee terms (Tastable standard): when set, cancelling less than fullRefundHours before the
+  /// start retains this percent of the ticket subtotal and refunds the rest. Null = tiered terms.
+  lateFeePercent       Int?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
@@ -619,6 +622,7 @@ model Booking {
   tickets     BookingTicket[]
   invitations EventInvitation[]
   review      Review?
+  reminder    BookingReminder?
 
   @@index([guestId, status])
   @@index([sessionId, status])
@@ -817,4 +821,27 @@ model ExperienceDailyStat {
   views        Int        @default(0)
 
   @@unique([experienceId, date])
+}
+
+enum ReminderStatus {
+  SCHEDULED
+  DISMISSED
+  CANCELLED
+}
+
+/// In-app reminder 24 hours before a booked session. Shown inside Tastable only: no email or push
+/// is sent (no delivery service is configured). Rescheduling a session moves remindAt; cancelling
+/// the booking or the session cancels the reminder.
+model BookingReminder {
+  id          String         @id @default(cuid())
+  bookingId   String         @unique
+  booking     Booking        @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  channel     String         @default("IN_APP")
+  remindAt    DateTime
+  status      ReminderStatus @default(SCHEDULED)
+  dismissedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status, remindAt])
 }

@@ -6,6 +6,7 @@ import { legacyMenuFromSections, sectionsFromLegacyMenu, stepDuration } from "@/
 import { serializeList } from "@/lib/domain/lists";
 import { publishProblems, type EventInput } from "@/lib/validation/event";
 import { cancelBooking } from "@/server/services/bookings";
+import { reminderTime } from "@/lib/booking/cancellation";
 import { DomainError } from "@/server/services/errors";
 
 type Db = PrismaClient;
@@ -203,6 +204,13 @@ export async function saveEvent(db: Db, hostId: string, input: EventInput, now: 
         if (!cur) throw new DomainError("Unknown session.", "NOT_FOUND");
         if (s.capacity < cur.seatsReserved) throw new DomainError(`Capacity can't be lower than the ${cur.seatsReserved} seats already sold.`);
         await tx.experienceSession.update({ where: { id: s.id }, data: { startsAt, endsAt, capacity: s.capacity } });
+        if (cur.startsAt.getTime() !== startsAt.getTime()) {
+          // Rescheduled: booked guests' in-app reminders follow the new time (and show again).
+          await tx.bookingReminder.updateMany({
+            where: { booking: { sessionId: s.id, status: "CONFIRMED" }, status: { not: "CANCELLED" } },
+            data: { remindAt: reminderTime(startsAt), status: "SCHEDULED", dismissedAt: null },
+          });
+        }
       } else {
         await tx.experienceSession.create({ data: { experienceId: exp.id, startsAt, endsAt, capacity: s.capacity } });
       }

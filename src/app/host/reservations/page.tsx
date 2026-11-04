@@ -139,7 +139,8 @@ function SessionBlock({ s, upcoming }: { s: ReservationSession; upcoming: boolea
           </div>
         </dl>
       </header>
-      <div className="overflow-x-auto">
+      {/* relative: keeps sr-only (absolutely positioned) cells inside the scroll area on small screens */}
+      <div className="relative overflow-x-auto">
         <table className="w-full min-w-[44rem] text-sm">
           <caption className="sr-only">Bookings for {s.experience.title}</caption>
           <thead className="text-left text-xs text-muted-foreground">

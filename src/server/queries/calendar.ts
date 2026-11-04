@@ -14,41 +14,57 @@ export type CalendarItem = {
   href: string;
   detail: string;
   sessionId: string;
+  /** Neighborhood (and venue name unless it's a secret location). */
+  place: string;
+  /** Status as shown to the guest: "Confirmed", "Cancelled", "Saved", "Invitation"... */
+  status: string;
+  tickets: number | null;
 };
+
+type VenueBits = { name: string; neighborhood: string; isSecretLocation: boolean };
+const placeOf = (v: VenueBits) => (v.isSecretLocation ? `Secret location, ${v.neighborhood}` : `${v.name}, ${v.neighborhood}`);
+const venueSelect = { select: { name: true, neighborhood: true, isSecretLocation: true } } as const;
 
 /** Everything on a guest's personal calendar: bookings (cancelled marked), saved, invitations. */
 export async function getCalendarItems(guestId: string, from: Date, to: Date): Promise<CalendarItem[]> {
   const [bookings, saved, invitations] = await Promise.all([
     db.booking.findMany({
       where: { guestId, session: { startsAt: { gte: from, lt: to } } },
-      include: { session: { include: { experience: { select: { title: true, slug: true } } } } },
+      include: { session: { include: { experience: { select: { title: true, slug: true, venue: venueSelect } } } } },
     }),
     db.savedExperience.findMany({
       where: { guestId },
       include: {
         experience: {
-          select: { id: true, title: true, slug: true, sessions: { where: { startsAt: { gte: from, lt: to }, status: "SCHEDULED" }, orderBy: { startsAt: "asc" } } },
+          select: { id: true, title: true, slug: true, venue: venueSelect, sessions: { where: { startsAt: { gte: from, lt: to }, status: "SCHEDULED" }, orderBy: { startsAt: "asc" } } },
         },
       },
     }),
     db.eventInvitation.findMany({
-      where: { inviteeId: guestId, status: { in: ["PENDING", "ACCEPTED"] }, session: { startsAt: { gte: from, lt: to } } },
-      include: { inviter: { select: { displayName: true } }, session: { include: { experience: { select: { title: true } } } } },
+      where: { inviteeId: guestId, status: { in: ["PENDING", "ACCEPTED"] }, session: { startsAt: { gte: from, lt: to }, status: { not: "CANCELLED" } } },
+      include: { inviter: { select: { displayName: true } }, session: { include: { experience: { select: { title: true, venue: venueSelect } } } } },
     }),
   ]);
 
   const bookedSessions = new Set(bookings.filter((b) => b.status !== "CANCELLED").map((b) => b.sessionId));
   const items: CalendarItem[] = [];
   for (const b of bookings) {
+    // The booking always follows its session, so a rescheduled date shows on the new day.
+    const eventCancelled = b.session.status === "CANCELLED";
+    const cancelled = b.status === "CANCELLED" || eventCancelled;
+    const tickets = `${b.ticketCount} ticket${b.ticketCount === 1 ? "" : "s"}`;
     items.push({
       id: `b-${b.id}`,
-      kind: b.status === "CANCELLED" ? "cancelled" : "booking",
+      kind: cancelled ? "cancelled" : "booking",
       date: isoDateNY(b.session.startsAt),
       startsAt: b.session.startsAt,
       title: b.session.experience.title,
       href: `/bookings/${b.reference}`,
-      detail: b.status === "CANCELLED" ? "Cancelled" : `${b.ticketCount} ticket${b.ticketCount === 1 ? "" : "s"}`,
+      detail: cancelled ? (eventCancelled && b.status !== "CANCELLED" ? "Event cancelled" : "Cancelled") : tickets,
       sessionId: b.sessionId,
+      place: placeOf(b.session.experience.venue),
+      status: b.status === "CANCELLED" ? "Cancelled" : eventCancelled ? "Event cancelled by host" : b.status === "COMPLETED" ? "Attended" : b.status === "PENDING" ? "Pending" : "Confirmed",
+      tickets: b.ticketCount,
     });
   }
   for (const s of saved) {
@@ -63,6 +79,9 @@ export async function getCalendarItems(guestId: string, from: Date, to: Date): P
         href: `/experiences/${s.experience.slug}?session=${session.id}`,
         detail: "Saved",
         sessionId: session.id,
+        place: placeOf(s.experience.venue),
+        status: "Saved",
+        tickets: null,
       });
     }
   }
@@ -76,6 +95,9 @@ export async function getCalendarItems(guestId: string, from: Date, to: Date): P
       href: `/invite/${inv.token}`,
       detail: `Invited by ${inv.inviter.displayName.split(" ")[0]}${inv.status === "ACCEPTED" ? " · accepted" : ""}`,
       sessionId: inv.sessionId,
+      place: placeOf(inv.session.experience.venue),
+      status: inv.status === "ACCEPTED" ? "Invitation accepted" : "Invitation",
+      tickets: null,
     });
   }
   return items.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());

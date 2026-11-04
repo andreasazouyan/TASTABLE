@@ -16,6 +16,7 @@ import { quote } from "../src/lib/booking/pricing";
 import { cancellationFee, computeRefund, policySnapshot } from "../src/lib/booking/refunds";
 import { nyDateTime, serverNow } from "../src/lib/clock";
 import { getNeighborhood } from "../src/lib/domain/neighborhoods";
+import { EVENT_IMAGE_CREDIT, eventImagesFor } from "../src/lib/domain/event-images";
 import { PHOTOS } from "../src/lib/domain/photos";
 import { isoDateNY } from "../src/lib/format";
 import {
@@ -28,6 +29,7 @@ import {
   type ExperienceSeed,
 } from "./seed-data";
 import { seedFoundation } from "./seed-foundation";
+import { reminderTime } from "../src/lib/booking/cancellation";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -215,7 +217,13 @@ async function main() {
         featured: e.featured ?? false,
         isFictional: true,
         photos: {
-          create: e.photos.map((key, i) => ({ url: PHOTOS[key].src, alt: PHOTOS[key].alt, credit: "Unsplash (placeholder)", sortOrder: i })),
+          // Tastable's own image (matched by filename) leads when there is one; placeholders follow.
+          create: [
+            ...eventImagesFor(e.slug).map((p) => ({ ...p, credit: EVENT_IMAGE_CREDIT })),
+            ...e.photos.map((key) => ({ url: PHOTOS[key].src, alt: PHOTOS[key].alt, credit: "Unsplash (placeholder)" })),
+          ]
+            .slice(0, 3)
+            .map((p, i) => ({ ...p, sortOrder: i })),
         },
       },
     });
@@ -573,6 +581,15 @@ async function main() {
   }
 
   const foundation = await seedFoundation(db, NOW);
+
+  // In-app reminders, 24 hours before, for confirmed bookings of upcoming sessions (shown in Tastable only).
+  const upcomingBookings = await db.booking.findMany({
+    where: { status: "CONFIRMED", session: { status: "SCHEDULED", startsAt: { gt: NOW } } },
+    select: { id: true, session: { select: { startsAt: true } } },
+  });
+  await db.bookingReminder.createMany({
+    data: upcomingBookings.map((b) => ({ id: `rem_${b.id}`, bookingId: b.id, remindAt: reminderTime(b.session.startsAt), createdAt: NOW })),
+  });
 
   const counts = {
     ...foundation,

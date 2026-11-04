@@ -138,3 +138,57 @@ describe("structured event content", () => {
     expect(itineraryProblems([step(0, 240)], 180)).toHaveLength(1);
   });
 });
+
+describe("onboarding cuisine choices", () => {
+  it("keeps 'Open to everything' exclusive", async () => {
+    const { toggleCuisine, OPEN_TO_EVERYTHING } = await import("@/lib/domain/preferences");
+    expect(toggleCuisine(["italian", "thai"], OPEN_TO_EVERYTHING, true)).toEqual([OPEN_TO_EVERYTHING]);
+    expect(toggleCuisine([OPEN_TO_EVERYTHING], "thai", true)).toEqual(["thai"]);
+    expect(guestPreferencesPatch.safeParse({ cuisines: ["any", "thai"] }).success).toBe(false);
+    expect(guestPreferencesPatch.safeParse({ cuisines: ["chinese", "vietnamese", "mediterranean"] }).success).toBe(true);
+  });
+});
+
+describe("seeded event content", () => {
+  it("gives every sample event a distinct cover photo and distinct photo set", async () => {
+    const { EXPERIENCES } = await import("../../prisma/seed-data");
+    const { PHOTOS } = await import("@/lib/domain/photos");
+    const covers = EXPERIENCES.map((e) => e.photos[0]);
+    expect(new Set(covers).size).toBe(EXPERIENCES.length);
+    expect(new Set(EXPERIENCES.map((e) => e.photos.join("|"))).size).toBe(EXPERIENCES.length);
+    for (const e of EXPERIENCES) {
+      expect(new Set(e.photos).size).toBe(e.photos.length);
+      for (const k of e.photos) expect(PHOTOS[k]).toBeDefined();
+    }
+    expect(new Set(Object.values(PHOTOS).map((p) => p.src)).size).toBe(Object.keys(PHOTOS).length);
+  });
+
+  it("has a structured menu for every sample event that passes host validation", async () => {
+    const { EXPERIENCES } = await import("../../prisma/seed-data");
+    const { SEED_MENUS } = await import("../../prisma/seed-menus");
+    const { menuSectionsInput } = await import("@/lib/domain/event-content");
+    for (const e of EXPERIENCES) {
+      const menu = SEED_MENUS[e.slug];
+      expect(menu, e.slug).toBeDefined();
+      const parsed = menuSectionsInput.safeParse(menu.sections.map((s) => ({ title: s.title, description: s.description ?? "", items: s.items.map((i) => ({ name: i.name, description: i.description ?? "", dietaryTags: i.dietary ?? [], dish: i.dish })) })));
+      expect(parsed.success, e.slug).toBe(true);
+    }
+  });
+});
+
+describe("Tastable event images", () => {
+  it("every mapped image file exists, covers are unique, and detail images follow the cover", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { ALL_EVENT_IMAGE_FILES, EVENT_IMAGES, eventImagesFor } = await import("@/lib/domain/event-images");
+    for (const f of ALL_EVENT_IMAGE_FILES) expect(fs.existsSync(path.join(process.cwd(), "public/tastable-event-images", f)), f).toBe(true);
+    const covers = Object.values(EVENT_IMAGES).map((i) => i.file);
+    expect(new Set(covers).size).toBe(covers.length);
+    expect(eventImagesFor("italian-pasta-making-workshop").map((p) => p.url)).toEqual([
+      "/tastable-event-images/pasta-making-class.jpg",
+      "/tastable-event-images/hands-on-cooking-class.jpg",
+      "/tastable-event-images/studio-kitchen.jpg",
+    ]);
+    expect(eventImagesFor("levantine-long-table-dinner")).toEqual([]);
+  });
+});

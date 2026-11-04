@@ -65,7 +65,7 @@ export function SiteFooter() {
       <div className="border-t">
         <div className="container-page flex flex-col gap-2 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>Tastable prototype. Sample data only, payments are simulated and no card details are collected.</p>
-          <p>Placeholder photography via Unsplash.</p>
+          <p>Event images by Tastable; other placeholder photography via Unsplash.</p>
         </div>
       </div>
     </footer>

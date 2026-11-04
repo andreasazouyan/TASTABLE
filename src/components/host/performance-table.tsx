@@ -46,7 +46,7 @@ export function PerformanceTable({ rows }: { rows: PerformanceRow[] }) {
   if (!rows.length) return <p className="py-8 text-center text-sm text-muted-foreground">No event dates in this period.</p>;
 
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[46rem] text-sm">
         <caption className="sr-only">Event performance. Select a column header to sort.</caption>
         <thead>

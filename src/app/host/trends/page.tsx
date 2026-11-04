@@ -284,7 +284,7 @@ function Section({ id, title, subtitle, children }: { id: string; title: string;
 
 function DataTable({ caption, head, rows }: { caption: string; head: string[]; rows: React.ReactNode[][] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[34rem] text-sm">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -333,7 +333,7 @@ function PreferenceMatrix({ prefs }: { prefs: { cuisines: string[]; motivations:
     ...MOTIVATIONS.flatMap((m) => topCuisines.map((c) => answered.filter((p) => p.motivations.includes(m.key) && p.cuisines.includes(c.key)).length)),
   );
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[36rem] border-separate border-spacing-[3px] text-xs">
         <caption className="mb-2 text-left text-xs text-muted-foreground">
           Guests who chose both the motivation (row) and the cuisine (column). {answered.length} guests answered both. A guest can appear in several cells.

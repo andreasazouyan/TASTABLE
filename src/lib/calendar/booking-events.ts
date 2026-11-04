@@ -26,6 +26,8 @@ export function bookingToIcs(b: BookingForIcs, baseUrl: string): IcsEvent {
     url: `${baseUrl}/experiences/${e.slug}`,
     status: b.status === "CANCELLED" ? "CANCELLED" : "CONFIRMED",
     sequence: b.status === "CANCELLED" ? 1 : 0,
+    // 24-hour reminder in the guest's own calendar app, matching the in-app reminder.
+    alarmHoursBefore: 24,
   };
 }
 
