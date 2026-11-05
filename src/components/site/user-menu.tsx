@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { UserMenuDropdown } from "@/components/site/user-menu-dropdown";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/demo";
 
@@ -12,8 +13,11 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-/** Signed-in demo persona, or a sign-in prompt. Reads cookies: render inside <Suspense>. */
-export async function UserMenu() {
+/**
+ * Signed-in demo persona, or a sign-in prompt. Reads cookies: render inside <Suspense>.
+ * `dropdown` (guest header) opens the profile dropdown; without it (host shell) it links to the profile.
+ */
+export async function UserMenu({ dropdown = false }: { dropdown?: boolean }) {
   const user = await getCurrentUser();
   if (!user) {
     return (
@@ -22,6 +26,7 @@ export async function UserMenu() {
       </Button>
     );
   }
+  if (dropdown) return <UserMenuDropdown name={user.name} initials={initials(user.name)} />;
   return (
     <Link
       href="/profile"
@@ -36,6 +41,6 @@ export async function UserMenu() {
   );
 }
 
-export function UserMenuFallback() {
-  return <div aria-hidden className="h-9 w-24 rounded-full bg-muted" />;
+export function UserMenuFallback({ className }: { className?: string }) {
+  return <div aria-hidden className={className ?? "h-9 w-24 rounded-full bg-muted"} />;
 }
