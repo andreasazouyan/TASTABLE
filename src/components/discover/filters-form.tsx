@@ -65,7 +65,21 @@ const fieldClass =
  * Discovery filters. Every change updates the URL (shareable). Without JavaScript the
  * Apply button submits the same GET form.
  */
-export function FiltersForm({ filters, className, onApplied }: { filters: DiscoveryFilters; className?: string; onApplied?: () => void }) {
+export function FiltersForm({
+  filters,
+  className,
+  onApplied,
+  basePath = "/discover",
+  showSearch = false,
+}: {
+  filters: DiscoveryFilters;
+  className?: string;
+  onApplied?: () => void;
+  /** Page the filters update; the host Explore tab reuses this form at /host/explore. */
+  basePath?: string;
+  /** Show a visible keyword search box (Discover takes search from the header instead). */
+  showSearch?: boolean;
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
@@ -73,13 +87,13 @@ export function FiltersForm({ filters, className, onApplied }: { filters: Discov
   const push = () => {
     if (!formRef.current) return;
     const qs = toQuery(formRef.current);
-    startTransition(() => router.push(qs ? `/discover?${qs}` : "/discover", { scroll: false }));
+    startTransition(() => router.push(qs ? `${basePath}?${qs}` : basePath, { scroll: false }));
   };
 
   return (
     <form
       ref={formRef}
-      action="/discover"
+      action={basePath}
       method="get"
       aria-label="Filter experiences"
       aria-busy={pending}
@@ -91,7 +105,21 @@ export function FiltersForm({ filters, className, onApplied }: { filters: Discov
         onApplied?.();
       }}
     >
-      {filters.q && <input type="hidden" name="q" value={filters.q} />}
+      {showSearch ? (
+        <Fieldset legend="Search">
+          <input
+            type="search"
+            name="q"
+            key={filters.q ?? ""}
+            defaultValue={filters.q}
+            placeholder="Title, host, cuisine…"
+            aria-label="Search experiences"
+            className={fieldClass}
+          />
+        </Fieldset>
+      ) : (
+        filters.q && <input type="hidden" name="q" value={filters.q} />
+      )}
       {filters.collection && <input type="hidden" name="collection" value={filters.collection} />}
       {filters.sort && <input type="hidden" name="sort" value={filters.sort} />}
 
@@ -185,7 +213,7 @@ export function FiltersForm({ filters, className, onApplied }: { filters: Discov
         <Button type="submit" className="flex-1">
           {pending ? "Updating…" : "Apply filters"}
         </Button>
-        <Button type="button" variant="outline" onClick={() => startTransition(() => { router.push("/discover"); onApplied?.(); })}>
+        <Button type="button" variant="outline" onClick={() => startTransition(() => { router.push(basePath); onApplied?.(); })}>
           Clear
         </Button>
       </div>
