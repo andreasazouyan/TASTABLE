@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { X } from "lucide-react";
 
+import { DateRangePicker } from "@/components/discover/date-range-picker";
 import { FiltersForm } from "@/components/discover/filters-form";
 import { MobileFilters } from "@/components/discover/mobile-filters";
 import { SortSelect } from "@/components/discover/sort-select";
@@ -23,10 +24,10 @@ import {
   parseFilters,
   type DiscoveryFilters,
 } from "@/lib/discovery/filters";
-import { WHEN_OPTIONS } from "@/lib/discovery/dates";
+import { WHEN_OPTIONS, whenDays } from "@/lib/discovery/dates";
 import { groupByDate } from "@/lib/discovery/grouping";
 import { resolveLocation } from "@/lib/discovery/location";
-import { formatDate } from "@/lib/format";
+import { formatDate, isoDateNY } from "@/lib/format";
 import { nyDateTime } from "@/lib/clock";
 import { requestNow } from "@/lib/request-clock";
 import { getSavedIds } from "@/server/queries/guest";
@@ -71,8 +72,11 @@ function chipsFor(f: DiscoveryFilters): Chip[] {
     if (first) chips.push({ label: last ? `${dateLabel(first)} – ${dateLabel(last)}` : `Date: ${dateLabel(first)}`, href: without(noDates) });
   } else {
     if (f.date) chips.push({ label: `Date: ${dateLabel(f.date)}`, href: without({ date: undefined }) });
-    if (f.from) chips.push({ label: `From ${dateLabel(f.from)}`, href: without({ from: undefined }) });
-    if (f.to) chips.push({ label: `Until ${dateLabel(f.to)}`, href: without({ to: undefined }) });
+    else if (f.from && f.to && f.to >= f.from) chips.push({ label: `Dates: ${dateLabel(f.from)} – ${dateLabel(f.to)}`, href: without(noDates) });
+    else {
+      if (f.from) chips.push({ label: `From ${dateLabel(f.from)}`, href: without({ from: undefined }) });
+      if (f.to) chips.push({ label: `Until ${dateLabel(f.to)}`, href: without({ to: undefined }) });
+    }
   }
   for (const slug of f.category)
     chips.push({ label: CATEGORIES.find((c) => c.slug === slug)!.shortName, href: without({ category: f.category.filter((x) => x !== slug) }) });
@@ -108,6 +112,10 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
   // One chosen day (from the calendar, or Choose Dates with a single date): say which day.
   const singleDay = !filters.when ? filters.date : filters.when === "custom" && !filters.to ? (filters.from ?? filters.date) : undefined;
   const singleDayLabel = singleDay ? formatDate(nyDateTime(singleDay, 12), { weekday: "long", month: "long", day: "numeric" }) : null;
+  // What the date picker shows: a day (?date=), a range (?from=&to=), or an older quick-date link.
+  const quick = filters.when && filters.when !== "custom" ? whenDays(filters.when, now) : null;
+  const pickStart = quick?.first ?? filters.date ?? filters.from;
+  const pickEnd = quick ? quick.last : filters.date ? undefined : filters.to;
 
   return (
     <div className="container-page pt-8 sm:pt-12">
@@ -135,7 +143,10 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
                 {singleDayLabel && <> on {singleDayLabel}</>}
               </h2>
             </div>
-            <SortSelect value={sort} defaultValue={DEFAULT_DISCOVER_SORT} />
+            <div className="flex flex-wrap items-center gap-3">
+              <DateRangePicker start={pickStart} end={pickEnd} today={isoDateNY(now)} />
+              <SortSelect value={sort} defaultValue={DEFAULT_DISCOVER_SORT} />
+            </div>
           </div>
 
           {chips.length > 0 && (

@@ -114,7 +114,7 @@ tests/e2e            Playwright journeys against a production build and prisma/e
   `NEIGHBORHOODS` with aliases for older spellings). Venues store the neighborhood/borough *name*;
   resolve with `neighborhoodForName` / `boroughKeyForName`. Discover's `borough` + `neighborhood`
   params (`src/lib/discovery/location.ts`): a borough with no neighborhoods ticked means the whole
-  borough. Discover's `when` param (`src/lib/discovery/dates.ts`) resolves quick dates in New York time.
+  borough. Discover dates come from the "Select dates" picker (`src/components/discover/date-range-picker.tsx`): `?date=` for one day, `?from=Discover's `when` param (`src/lib/discovery/dates.ts`) resolves quick dates in New York time.to=` for a range; older `when` links still resolve in New York time (`src/lib/discovery/dates.ts`). Calendar dates link to `/discover?date=`.
 - **Saves**: `Experience.saveCount` = unique savers, changed only via `src/server/services/saved.ts`.
 - **Reviews**: one per booking/session, verified by a checked-in ticket, relationships derived from
   the booking (`src/server/services/reviews.ts`). One rating calculation: `ratingSummary` in

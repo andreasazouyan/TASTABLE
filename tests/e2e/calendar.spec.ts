@@ -92,10 +92,10 @@ test("every date opens Discover filtered to that day, with counts that match; wo
   for (const c of cards) expect(c).toMatch(/Tue, Nov 10/);
 
   // Other filters combine with the date and keep it; removing the date chip keeps the others.
-  await expect(page.getByRole("complementary", { name: "Filters" }).getByRole("radio", { name: "Choose Dates" })).toBeChecked();
+  await expect(page.getByRole("button", { name: "Dates: Tue, Nov 10. Change dates" })).toBeVisible();
   await page.getByRole("complementary", { name: "Filters" }).getByLabel("Cooking Classes & Workshops").check();
   await page.waitForURL(/category=classes/);
-  await expect(page).toHaveURL(/from=2026-11-10/);
+  await expect(page).toHaveURL(/date=2026-11-10/);
   for (const c of await page.getByRole("list", { name: "Results" }).getByRole("article").allInnerTexts()) expect(c).toMatch(/Tue, Nov 10/);
   await page.getByRole("list", { name: "Active filters" }).getByRole("link", { name: /Remove filter: Date: Tue, Nov 10/ }).click();
   await page.waitForURL((u) => !u.search.includes("from=") && u.search.includes("category=classes"));
