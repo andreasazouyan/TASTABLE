@@ -8,6 +8,7 @@ import { ShareButton } from "@/components/experiences/share-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireGuest } from "@/lib/auth/demo";
+import { eventCountsByDay, type DayEventCount } from "@/lib/calendar/event-counts";
 import { addDaysIso, addMonthsIso, monthGrid, sameMonth, weekDays } from "@/lib/calendar/grid";
 import { nyDateTime } from "@/lib/clock";
 import { formatDate, formatTime, isoDateNY } from "@/lib/format";
@@ -15,6 +16,7 @@ import { requestNow } from "@/lib/request-clock";
 import { cn } from "@/lib/utils";
 import { enableCalendarSharing, revokeCalendarSharing, setShowTitles, toggleSharedSession } from "@/server/actions/sharing";
 import { getCalendarItems, getSharingSettings, type CalendarItem, type CalendarItemKind } from "@/server/queries/calendar";
+import { getListings } from "@/server/queries/listings";
 
 export const metadata: Metadata = { title: "Calendar" };
 
@@ -57,10 +59,50 @@ function Legend() {
       {(Object.keys(KIND_STYLE) as CalendarItemKind[]).map((k) => (
         <li key={k} className="flex items-center gap-2">
           <span aria-hidden className={cn("size-3 rounded-full", KIND_STYLE[k].dot)} />
-          {KIND_STYLE[k].label}
+          {k === "booking" ? "Booked (confirmed)" : KIND_STYLE[k].label}
         </li>
       ))}
+      <li className="flex items-center gap-2">
+        <span aria-hidden className="inline-flex h-4 min-w-6 items-center justify-center rounded-full border border-foreground/35 bg-card px-1 text-[10px] leading-none text-foreground">3</span>
+        Experiences on offer
+      </li>
+      <li className="flex items-center gap-2">
+        <span aria-hidden className="inline-flex h-4 min-w-6 items-center justify-center rounded-full border border-dashed border-muted-foreground/50 px-1 text-[10px] leading-none text-muted-foreground">2</span>
+        Sold out
+      </li>
     </ul>
+  );
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** "5 experiences, 4 with seats" (screen readers and tooltips). */
+function countLabel(c: DayEventCount | undefined) {
+  if (!c) return "no experiences listed";
+  if (c.available === 0) return `${plural(c.total, "experience")}, all sold out`;
+  return c.available === c.total ? plural(c.total, "experience") : `${plural(c.total, "experience")}, ${c.available} with seats`;
+}
+
+/**
+ * The day's count of public experiences (the number Discover shows for that date): outlined,
+ * never filled, so it reads as "on offer", distinct from the solid terracotta of a confirmed
+ * booking. Days where everything is sold out are dashed.
+ */
+function EventCount({ count, wide }: { count: DayEventCount | undefined; wide?: boolean }) {
+  if (!count) return null;
+  const soldOut = count.available === 0;
+  return (
+    <span
+      aria-hidden
+      title={countLabel(count)}
+      className={cn(
+        "inline-flex h-5 items-center gap-1 rounded-full border px-1.5 text-[10px] leading-none font-medium sm:text-[11px]",
+        soldOut ? "border-dashed border-muted-foreground/50 text-muted-foreground" : "border-foreground/35 bg-card text-foreground",
+      )}
+    >
+      <span className="tabular-nums">{count.total}</span>
+      <span className={cn(!wide && "hidden sm:inline")}>{soldOut ? "sold out" : count.total === 1 ? "event" : "events"}</span>
+    </span>
   );
 }
 
@@ -166,7 +208,9 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
   const days = view === "month" ? monthGrid(anchor).flat() : weekDays(anchor);
   const from = nyDateTime(days[0]);
   const to = nyDateTime(addDaysIso(days[days.length - 1], 1));
-  const [items, sharing] = await Promise.all([getCalendarItems(guest.id, from, to), getSharingSettings(guest.id, now)]);
+  const [items, sharing, listings] = await Promise.all([getCalendarItems(guest.id, from, to), getSharingSettings(guest.id, now), getListings(now.toISOString())]);
+  // Same listings as Discover, so each date's count matches Discover for that date.
+  const counts = eventCountsByDay(listings, now);
   const byDate = new Map<string, CalendarItem[]>();
   for (const it of items) byDate.set(it.date, [...(byDate.get(it.date) ?? []), it]);
 
@@ -182,7 +226,8 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
   const selectedItems = selected
     ? (byDate.get(selected) ?? (selected >= days[0] && selected <= days[days.length - 1] ? [] : await getCalendarItems(guest.id, nyDateTime(selected), nyDateTime(addDaysIso(selected, 1)))))
     : [];
-  const selectHref = (d: string) => `${link({ day: d })}#selected-day`;
+  // Every date opens Discover filtered to exactly that day.
+  const discoverHref = (d: string) => `/discover?date=${d}`;
   const dayName = (d: string) =>
     formatDate(nyDateTime(d, 12), {
       weekday: "long",
@@ -240,7 +285,7 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
         </nav>
       </div>
       <Legend />
-      <p className="mt-2 text-xs text-muted-foreground">Tap a day to see your plans and explore what&apos;s on.</p>
+      <p className="mt-2 text-xs text-muted-foreground">Tap a date to see everything on that day in Discover. Tap a booking to open it.</p>
 
       <div className="mt-4 grid items-start gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="min-w-0">
@@ -271,9 +316,9 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
                     >
                       {/* The whole cell selects the day; event chips sit above it and open the event. */}
                       <Link
-                        href={selectHref(d)}
-                        className="absolute inset-0 z-0 rounded-none outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
-                        aria-label={`Select ${dayName(d)}${list.length ? `, ${list.length} ${list.length === 1 ? "item" : "items"}` : ""}${booked ? ", booked" : ""}`}
+                        href={discoverHref(d)}
+                        className="absolute inset-0 z-0 rounded-none outline-none hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
+                        aria-label={`Discover ${dayName(d)}: ${countLabel(counts.get(d))}${booked ? ", you're booked" : ""}`}
                         aria-current={d === today ? "date" : undefined}
                       />
                       <span className="pointer-events-none relative mb-1 flex items-center gap-1">
@@ -287,6 +332,9 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
                           {Number(d.slice(8))}
                         </span>
                         {booked && <span aria-hidden className="size-1.5 rounded-full bg-brand" />}
+                        <span className="ml-auto">
+                          <EventCount count={counts.get(d)} />
+                        </span>
                       </span>
                       <div className="relative z-10 space-y-1">
                         {list.slice(0, 3).map((it) => (
@@ -307,9 +355,9 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
                 return (
                   <li key={d} className={cn("rounded-2xl border bg-card p-3 shadow-soft", d === today && "border-foreground", d === selected && "bg-brand-soft/50 ring-2 ring-brand")}>
                     <Link
-                      href={selectHref(d)}
-                      className="mb-2 flex items-center gap-1.5 rounded text-sm font-medium underline-offset-4 hover:underline"
-                      aria-label={`Select ${dayName(d)}${list.length ? `, ${list.length} ${list.length === 1 ? "item" : "items"}` : ""}`}
+                      href={discoverHref(d)}
+                      className="mb-2 flex flex-wrap items-center gap-1.5 rounded text-sm font-medium underline-offset-4 hover:underline"
+                      aria-label={`Discover ${dayName(d)}: ${countLabel(counts.get(d))}${booked ? ", you're booked" : ""}`}
                       aria-current={d === today ? "date" : undefined}
                     >
                       {formatDate(nyDateTime(d, 12), {
@@ -318,6 +366,7 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
                         day: "numeric",
                       })}
                       {booked && <span aria-hidden className="size-1.5 rounded-full bg-brand" />}
+                      <EventCount count={counts.get(d)} wide />
                     </Link>
                     {list.length ? (
                       <div className="space-y-2">
@@ -337,7 +386,7 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
         {selected ? (
           <DayPanel day={selected} items={selectedItems} today={today} />
         ) : (
-          <p className="rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">Select a day to see your plans and explore experiences on that date.</p>
+          <p className="rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">Tap any date to see every experience on that day in Discover.</p>
         )}
       </div>
 

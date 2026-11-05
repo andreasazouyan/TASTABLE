@@ -14,9 +14,8 @@ test("When quick dates filter Discover, stay highlighted and combine with other 
   await when.getByText("Tomorrow", { exact: true }).click();
   await page.waitForURL(/when=tomorrow/);
   await expect(when.getByRole("radio", { name: "Tomorrow" })).toBeChecked();
-  // The sample data has nothing on Tuesday Nov 3: a helpful empty state, not other days.
-  await expect(page.getByText("No experiences match these filters")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Clear all filters" })).toBeVisible();
+  // Tomorrow shows Tuesday Nov 3 only.
+  for (const text of await cardDates(page)) expect(text).toMatch(/Tue, Nov 3/);
   await expect(page.getByRole("list", { name: "Active filters" }).getByRole("link", { name: "Remove filter: Tomorrow" })).toBeVisible();
 
   await when.getByText("This Weekend", { exact: true }).click();
@@ -43,7 +42,7 @@ test("When quick dates filter Discover, stay highlighted and combine with other 
   await page.waitForURL(/to=2026-12-02/);
   await expect(page).toHaveURL(/when=custom/);
   const chips = page.getByRole("list", { name: "Active filters" });
-  await expect(chips.getByRole("link", { name: /Remove filter: Nov 28 – Dec 2/ })).toBeVisible();
+  await expect(chips.getByRole("link", { name: /Remove filter: Sat, Nov 28 – Wed, Dec 2/ })).toBeVisible();
 
   // Clear Dates removes only the date filter.
   await aside.getByRole("button", { name: "Clear Dates" }).click();
@@ -57,6 +56,13 @@ test("a shared ?date= link shows that day only, with Choose Dates active", async
   const when = page.getByRole("complementary", { name: "Filters" }).getByRole("radiogroup", { name: "When" });
   await expect(when.getByRole("radio", { name: "Choose Dates" })).toBeChecked();
   for (const text of await cardDates(page)) expect(text).toMatch(/Thu, Nov 5/);
+  await expect(page.getByRole("heading", { name: /experiences? on Thursday, November 5/ })).toBeVisible();
+});
+
+test("a date with nothing on it shows a helpful empty state, not other days", async ({ page }) => {
+  await page.goto("/discover?date=2027-03-02");
+  await expect(page.getByText("No experiences match these filters")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Clear all filters" })).toBeVisible();
 });
 
 test("Discover opens by date (Soonest First) with day headings; other sorts are one grid", async ({ page }) => {
@@ -65,8 +71,8 @@ test("Discover opens by date (Soonest First) with day headings; other sorts are 
   await expect(page.getByLabel("Sort").locator("option:checked")).toHaveText("Date: Soonest First");
   const results = page.getByRole("list", { name: "Results" });
   const headings = await results.locator("h3[id^='day-']").allTextContents();
-  // Clock: Monday Nov 2; the sample data's first sessions are on Wednesday Nov 4.
-  expect(headings.slice(0, 3)).toEqual(["Wednesday, November 4", "Thursday, November 5", "Friday, November 6"]);
+  // Clock: Monday Nov 2 at noon; the sample data has sessions every day from today.
+  expect(headings.slice(0, 3)).toEqual(["Today — November 2", "Tomorrow — November 3", "Wednesday, November 4"]);
   expect(new Set(headings).size).toBe(headings.length);
 
   // An experience with sessions on several dates appears under each date.
