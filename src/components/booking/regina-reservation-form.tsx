@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { Gift, ShieldCheck, Users } from "lucide-react";
+import { Gift, Minus, Plus, ShieldCheck, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { REGINA_BOOK_LABEL, REGINA_MAINS, REGINA_PARTY_SIZE, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
+import { MAX_TICKETS_PER_BOOKING } from "@/lib/booking/pricing";
+import { REGINA_MAINS, REGINA_PRICE_NOTE, reginaBookLabel, reginaPartySize } from "@/lib/domain/reginas-table";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { reserveReginasTableAction, type ReginaReserveState } from "@/server/actions/reginas-table";
@@ -15,6 +16,8 @@ import { reserveReginasTableAction, type ReginaReserveState } from "@/server/act
 type Props = {
   sessionId: string;
   seatsLeft: number;
+  /** Seats chosen on the event page's booking card (`?seats=N`), kept within 1 and the seats left. */
+  initialSeats?: number;
   dateLabel: string;
   timeLabel: string;
   venueName: string;
@@ -64,30 +67,52 @@ function MainChoice({ name, legend, value, onChange, error }: { name: string; le
 }
 
 /**
- * Regina's Table reservation: exactly two guests (you and a +1), a main course for each, and a
- * $0 total. No payment step: the event is complimentary.
+ * Regina's Entrepreneurship Class Supper reservation: the standard quantity selector (1 up to the
+ * seats left), a main course for each guest, and a $0 total. No payment step: it is complimentary.
  */
 export function ReginaReservationForm(p: Props) {
   const [state, action, pending] = useActionState<ReginaReserveState, FormData>(reserveReginasTableAction, null);
+  const max = Math.max(1, Math.min(MAX_TICKETS_PER_BOOKING, p.seatsLeft));
+  const [seats, setSeats] = useState(() => reginaPartySize(p.initialSeats ?? 1, p.seatsLeft, MAX_TICKETS_PER_BOOKING));
   // Controlled so choices survive a server-side validation error (React resets uncontrolled forms).
+  // Names and mains are kept for every guest slot, so lowering then raising the count keeps them.
   const [name, setName] = useState(p.defaultName);
-  const [plusOne, setPlusOne] = useState("");
-  const [mainGuest, setMainGuest] = useState("");
-  const [mainPlusOne, setMainPlusOne] = useState("");
+  const [guestNames, setGuestNames] = useState<string[]>(() => Array(MAX_TICKETS_PER_BOOKING).fill(""));
+  const [mains, setMains] = useState<string[]>(() => Array(MAX_TICKETS_PER_BOOKING).fill(""));
   const fe = state?.fieldErrors ?? {};
   const label = (k: string) => REGINA_MAINS.find((m) => m.key === k)?.label ?? "Not chosen yet";
-  const enough = p.seatsLeft >= REGINA_PARTY_SIZE;
+  const enough = p.seatsLeft >= 1;
+  const guestLabel = (i: number) => (i === 0 ? name.trim() || "You" : guestNames[i].trim() || `Guest ${i + 1}`);
+  const setAt = (setter: typeof setMains, i: number, v: string) => setter((arr) => arr.map((x, j) => (j === i ? v : x)));
 
   return (
     <form action={action} className="grid gap-6 lg:grid-cols-[1fr_22rem] lg:items-start" noValidate>
       <input type="hidden" name="sessionId" value={p.sessionId} />
+      <input type="hidden" name="ticketCount" value={seats} />
 
       <div className="space-y-6">
         <Step n={1} title="Your party">
-          <p className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-            <Users className="size-4 text-brand" aria-hidden /> Every reservation is for 2 guests: you and a +1. {p.seatsLeft} seats left.
-          </p>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="font-medium">Seats</p>
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="size-4 text-brand" aria-hidden /> Free · {p.seatsLeft} {p.seatsLeft === 1 ? "seat" : "seats"} left
+              </p>
+            </div>
+            <div className="flex items-center gap-2" role="group" aria-label="Seat quantity">
+              <Button type="button" variant="outline" size="icon" onClick={() => setSeats((n) => Math.max(1, n - 1))} disabled={seats <= 1} aria-label="Remove a seat">
+                <Minus aria-hidden />
+              </Button>
+              <output aria-live="polite" data-testid="seat-count" className="w-10 text-center text-lg font-semibold tabular-nums">
+                {seats}
+              </output>
+              <Button type="button" variant="outline" size="icon" onClick={() => setSeats((n) => Math.min(max, n + 1))} disabled={seats >= max} aria-label="Add a seat">
+                <Plus aria-hidden />
+              </Button>
+            </div>
+          </div>
+          <FieldError messages={fe.ticketCount} />
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="contactName">Your name</Label>
               <Input id="contactName" name="contactName" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="mt-1.5" aria-invalid={!!fe.contactName} required />
@@ -98,18 +123,21 @@ export function ReginaReservationForm(p: Props) {
               <Input id="contactEmail" name="contactEmail" type="email" defaultValue={p.defaultEmail} autoComplete="email" className="mt-1.5" aria-invalid={!!fe.contactEmail} required />
               <FieldError messages={fe.contactEmail} />
             </div>
-            <div className="sm:col-span-2">
-              <Label htmlFor="plusOneName">Your +1&apos;s name (optional)</Label>
-              <Input id="plusOneName" name="plusOneName" value={plusOne} onChange={(e) => setPlusOne(e.target.value)} className="mt-1.5" placeholder="Shown on their ticket" />
-            </div>
+            {Array.from({ length: seats - 1 }, (_, k) => k + 1).map((i) => (
+              <div key={i} className="sm:col-span-2">
+                <Label htmlFor={`guestName${i}`}>Guest {i + 1} name (optional)</Label>
+                <Input id={`guestName${i}`} name={`guestName${i}`} value={guestNames[i]} onChange={(e) => setAt(setGuestNames, i, e.target.value)} className="mt-1.5" placeholder="Shown on their ticket" />
+              </div>
+            ))}
           </div>
         </Step>
 
-        <Step n={2} title="Choose your mains">
+        <Step n={2} title={seats === 1 ? "Choose your main" : "Choose your mains"}>
           <p className="mb-4 text-sm text-muted-foreground">Everyone starts with a fresh green salad and finishes with chocolate cake.</p>
           <div className="space-y-5">
-            <MainChoice name="mainGuest" legend={`Main for ${name.trim() || "you"}`} value={mainGuest} onChange={setMainGuest} error={fe.mainGuest} />
-            <MainChoice name="mainPlusOne" legend={`Main for ${plusOne.trim() || "your +1"}`} value={mainPlusOne} onChange={setMainPlusOne} error={fe.mainPlusOne} />
+            {Array.from({ length: seats }, (_, i) => (
+              <MainChoice key={i} name={`main${i}`} legend={i === 0 ? `Main for ${name.trim() || "you"}` : `Main for ${guestLabel(i)}`} value={mains[i]} onChange={(v) => setAt(setMains, i, v)} error={fe[`main${i}`]} />
+            ))}
           </div>
           <div className="mt-5">
             <Label htmlFor="dietaryRequirements">Allergies or anything Regina should know (optional)</Label>
@@ -143,16 +171,16 @@ export function ReginaReservationForm(p: Props) {
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-muted-foreground">Guests</dt>
-            <dd className="text-right">2 (you + 1)</dd>
+            <dd className="text-right tabular-nums" data-testid="summary-guests">
+              {seats} {seats === 1 ? "guest" : "guests"}
+            </dd>
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">{name.trim() || "You"}</dt>
-            <dd className={cn("text-right", !mainGuest && "text-muted-foreground")}>{label(mainGuest)}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted-foreground">{plusOne.trim() || "Your +1"}</dt>
-            <dd className={cn("text-right", !mainPlusOne && "text-muted-foreground")}>{label(mainPlusOne)}</dd>
-          </div>
+          {Array.from({ length: seats }, (_, i) => (
+            <div key={i} className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">{guestLabel(i)}</dt>
+              <dd className={cn("text-right", !mains[i] && "text-muted-foreground")}>{label(mains[i])}</dd>
+            </div>
+          ))}
           <div className="flex justify-between border-t pt-3 text-base font-semibold">
             <dt>Total</dt>
             <dd className="tabular-nums" data-testid="checkout-total">
@@ -174,7 +202,7 @@ export function ReginaReservationForm(p: Props) {
           </div>
         )}
         <Button type="submit" variant="brand" size="lg" className="mt-5 w-full" disabled={pending || !enough} aria-disabled={pending || !enough}>
-          {pending ? "Reserving…" : enough ? REGINA_BOOK_LABEL : "Sold out"}
+          {pending ? "Reserving…" : enough ? reginaBookLabel(seats) : "Sold out"}
         </Button>
         <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
           <ShieldCheck className="size-3.5 shrink-0" aria-hidden /> Demo reservation. No payment, no invitations sent.

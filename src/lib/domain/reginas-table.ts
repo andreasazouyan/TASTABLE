@@ -1,7 +1,7 @@
 /**
- * Regina's Table: the special, complimentary Tastable demo event (Thursday, November 19, 2026)
- * with its own reservation flow: every reservation is exactly two guests (you and a +1), each
- * guest picks a main course, and the total is always $0.
+ * Regina's Entrepreneurship Class Supper: the special, complimentary Tastable demo event
+ * (Thursday, November 19, 2026) with its own reservation flow: reserve 1 seat up to the seats
+ * left, each guest picks a main course, and the total is always $0.
  *
  * Single source of truth for the event's identity and rules, shared by the seed, the
  * reservation service, the pages and the developer-only reset.
@@ -20,9 +20,10 @@ export const REGINA_SEEDED_SEATS = 9;
 /** Bookings created by the seed carry this id prefix; the reset never touches them. */
 export const REGINA_SEEDED_BOOKING_PREFIX = "bkg_regina_";
 
-export const REGINA_PARTY_SIZE = 2;
+export const REGINA_TITLE = "Regina's Entrepreneurship Class Supper";
 export const REGINA_PRICE_NOTE = "Complimentary experience — Special Tastable Demo Event";
-export const REGINA_BOOK_LABEL = "Reserve for 2 — Free";
+/** Label on the event page's booking card, before a quantity is chosen. */
+export const REGINA_BOOK_LABEL = "Reserve — Free";
 export const REGINA_CONFIRMED_TITLE = "You're on the guest list!";
 export const REGINA_ADDRESS = "500 Riverside Drive, Manhattan, NY 10027";
 
@@ -31,6 +32,18 @@ export const REGINA_MAINS = [
   { key: "PESTO", label: "Vegetarian pesto pasta" },
 ] as const;
 export type ReginaMainKey = (typeof REGINA_MAINS)[number]["key"];
+
+/** "Reserve 1 seat — Free", "Reserve 2 seats — Free", ... */
+export function reginaBookLabel(seats: number) {
+  return `Reserve ${seats} ${seats === 1 ? "seat" : "seats"} — Free`;
+}
+
+/** A requested party size kept within 1 and the seats left (and the per-booking ticket limit). */
+export function reginaPartySize(requested: unknown, seatsLeft: number, maxPerBooking: number) {
+  const max = Math.max(1, Math.min(seatsLeft, maxPerBooking));
+  const n = Math.trunc(Number(requested));
+  return Number.isFinite(n) ? Math.min(max, Math.max(1, n)) : 1;
+}
 
 export function reginaMainLabel(key: string) {
   return REGINA_MAINS.find((m) => m.key === key)?.label ?? null;

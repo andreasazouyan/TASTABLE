@@ -37,7 +37,7 @@ export function SessionPicker({
   sessions: PickerSession[];
   initialId?: string;
   path: string;
-  /** Optional overrides for events with their own reservation flow (e.g. Regina's Table, pairs only). */
+  /** Optional overrides for events with their own reservation flow (e.g. Regina's free event). */
   bookLabel?: string;
   seatNoun?: "spot" | "seat";
   minSeats?: number;

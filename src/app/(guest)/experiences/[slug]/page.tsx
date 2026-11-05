@@ -28,7 +28,7 @@ import { requestNow } from "@/lib/request-clock";
 import { db } from "@/lib/db";
 import { getExperienceDetail } from "@/server/queries/listings";
 import { ReginaResetPanel } from "@/components/booking/regina-reset-panel";
-import { demoToolsEnabled, isReginasTable, REGINA_BOOK_LABEL, REGINA_PARTY_SIZE, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
+import { demoToolsEnabled, isReginasTable, REGINA_BOOK_LABEL, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
 import { findReginaReservation } from "@/server/services/reginas-table";
 
 export default function ExperiencePage(props: PageProps<"/experiences/[slug]">) {
@@ -72,7 +72,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
     getPublicReviews({ experienceId: exp.id }, reviewSort, 20, guestId),
   ]);
   const waitlistedIds = new Set(waitlisted.map((w) => w.sessionId));
-  // Regina's Table: reservations are for 2 (you + 1), free, with its own guest list.
+  // Regina's event: free (1 seat up to the seats left), with its own guest list.
   const regina = isReginasTable(exp.slug);
   const reginaReservation = regina && guestId ? await findReginaReservation(db, guestId) : null;
   const following = (user?.guestProfile?.preferences?.followedHosts ?? "").split(",").includes(exp.host.slug);
@@ -338,7 +338,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 <p className="mt-1 text-sm font-medium text-accent-foreground" data-testid="price-note">
                   {REGINA_PRICE_NOTE}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">One-time only · Reservations are for 2 guests (you + 1)</p>
+                <p className="mt-1 text-xs text-muted-foreground">One-time only</p>
               </div>
             ) : (
               <p className="mb-5">
@@ -355,7 +355,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </Link>
               </div>
             ) : regina ? (
-              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} bookLabel={REGINA_BOOK_LABEL} seatNoun="seat" minSeats={REGINA_PARTY_SIZE} />
+              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} bookLabel={REGINA_BOOK_LABEL} seatNoun="seat" />
             ) : (
               <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} />
             )}

@@ -22,7 +22,7 @@ function revalidateViews() {
   revalidatePath(`/experiences/${REGINA_SLUG}`);
 }
 
-/** Reserve for 2, free. Validated on the server; seats are reserved atomically. */
+/** Reserve 1 or more seats, free. Validated on the server; seats are reserved atomically. */
 export async function reserveReginasTableAction(_prev: ReginaReserveState, formData: FormData): Promise<ReginaReserveState> {
   const user = await getCurrentUser();
   if (!user?.guestProfile) return { error: "Choose a demo identity before reserving." };
