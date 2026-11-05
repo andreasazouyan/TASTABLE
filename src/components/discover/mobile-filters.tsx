@@ -8,7 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { DiscoveryFilters } from "@/lib/discovery/filters";
 
-export function MobileFilters({ filters, count }: { filters: DiscoveryFilters; count: number }) {
+export function MobileFilters({
+  filters,
+  count,
+  basePath,
+  showSearch,
+}: {
+  filters: DiscoveryFilters;
+  count: number;
+  basePath?: string;
+  showSearch?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -23,7 +33,7 @@ export function MobileFilters({ filters, count }: { filters: DiscoveryFilters; c
           <SheetTitle>Filters</SheetTitle>
           <SheetDescription>Results update as you choose.</SheetDescription>
         </SheetHeader>
-        <FiltersForm filters={filters} className="px-5 pb-6" onApplied={() => setOpen(false)} />
+        <FiltersForm filters={filters} basePath={basePath} showSearch={showSearch} className="px-5 pb-6" onApplied={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
   );
