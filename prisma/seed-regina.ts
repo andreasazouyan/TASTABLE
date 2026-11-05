@@ -1,5 +1,5 @@
 /**
- * Regina's Table: the one-time, complimentary supper club for the live MVP demo.
+ * Regina's Entrepreneurship Class Supper: the one-time, complimentary supper club for the live MVP demo.
  *
  * Unlike the fictional catalog, this event is real-world (a real venue on a fixed date), so it is
  * not marked as a fictional sample. It is added by its own idempotent step, without the seed's
@@ -9,7 +9,7 @@
  *   - Existing database: `npm run demo:regina` (or the hosted build) adds it if it's missing.
  *
  * One session (Thursday, November 19, 2026, 8:30–11:00 PM New York time), 15 seats, 9 already
- * taken by seeded guests, so 6 seats (3 reservations of 2) are left.
+ * taken by seeded guests, so 6 seats are left.
  */
 import type { PrismaClient } from "../src/generated/prisma/client";
 import { quote } from "../src/lib/booking/pricing";
@@ -28,6 +28,7 @@ import {
   REGINA_SESSION_ID,
   REGINA_SLUG,
   REGINA_START,
+  REGINA_TITLE,
 } from "../src/lib/domain/reginas-table";
 
 const EXP_ID = `exp_${REGINA_SLUG}`;
@@ -46,6 +47,9 @@ const MENU = [
   },
   { title: "Dessert", items: [{ name: "Chocolate cake", description: "", dietaryTags: ["vegetarian"] }] },
 ];
+
+/** Kept here so existing databases can be updated in place (scripts/reginas-table.ts). */
+export const REGINA_INCLUSIONS = ["Welcome drinks", "Homemade three-course dinner", "A main course of your choice for each guest"];
 
 const SCHEDULE = [
   { startOffsetMinutes: 0, durationMinutes: 30, title: "Welcome drinks and mingling", description: "Arrive, grab a drink and meet the other guests." },
@@ -68,7 +72,7 @@ export async function seedReginasTable(db: PrismaClient, now: Date) {
 
   const latePolicy = await db.cancellationPolicy.findFirst({ where: { hostId: null, key: LATE_FEE_POLICY_KEY } });
   const eventPolicy = await db.cancellationPolicy.findFirst({ where: { hostId: null, key: "FLEXIBLE_24H" } });
-  if (!latePolicy || !eventPolicy) throw new Error("Seed the platform cancellation policies before Regina's Table.");
+  if (!latePolicy || !eventPolicy) throw new Error("Seed the platform cancellation policies before Regina's event.");
 
   await db.user.upsert({
     where: { id: `usr_${HOST_KEY}` },
@@ -86,7 +90,7 @@ export async function seedReginasTable(db: PrismaClient, now: Date) {
     displayName: "Regina",
     hostType: "CREATOR_INFLUENCER" as const,
     tagline: "Homemade dinners that bring people together",
-    background: "Food creator and host of Regina's Table, an intimate supper club",
+    background: "Food creator and host of intimate supper clubs",
     bio: "Regina cooks a homemade three-course dinner for a small table of guests, with plenty of time to meet new people.",
     homeNeighborhood: "morningside-heights",
     cuisineExpertise: "italian",
@@ -124,7 +128,7 @@ export async function seedReginasTable(db: PrismaClient, now: Date) {
     data: {
       id: EXP_ID,
       slug: REGINA_SLUG,
-      title: "Regina's Table: An Intimate Supper Club",
+      title: REGINA_TITLE,
       summary: "A homemade three-course dinner for just 15 guests at International House New York.",
       description:
         "Join Regina for an intimate supper club at International House New York. Enjoy a homemade three-course dinner, meet new people, and spend an evening connecting over good food and conversation. With just 15 guests, this is a relaxed and welcoming experience designed to bring people together around the table.",
@@ -137,7 +141,7 @@ export async function seedReginasTable(db: PrismaClient, now: Date) {
       occasions: "MEET_NEW_PEOPLE,BRING_A_FRIEND",
       highlights: JSON.stringify(["Just 15 guests around one table", "Homemade three-course dinner", "Complimentary: a special Tastable demo event"]),
       menu: JSON.stringify(legacyMenuFromSections(menuSections as MenuSectionInput[])),
-      inclusions: JSON.stringify(["Welcome drinks", "Homemade three-course dinner", "A main course of your choice for you and your +1"]),
+      inclusions: JSON.stringify(REGINA_INCLUSIONS),
       status: "PUBLISHED",
       publishedAt: new Date(now.getTime() - 86_400_000),
       hostId: `hst_${HOST_KEY}`,

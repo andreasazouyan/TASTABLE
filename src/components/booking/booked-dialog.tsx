@@ -18,7 +18,7 @@ export function BookedDialog(p: {
   policyNotice: string | null;
   feeSentence: string | null;
   icsHref: string;
-  /** Optional overrides, e.g. Regina's Table: "You're on the guest list!" with venue and meal choices. */
+  /** Optional overrides, e.g. Regina's event: "You're on the guest list!" with venue and meal choices. */
   heading?: string;
   ticketsTitle?: string;
   totalTitle?: string;

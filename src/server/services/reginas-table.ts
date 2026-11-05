@@ -1,6 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
-  REGINA_PARTY_SIZE,
   REGINA_SEEDED_BOOKING_PREFIX,
   REGINA_SESSION_ID,
   reginaMainLabel,
@@ -12,27 +11,24 @@ import { DomainError } from "@/server/services/errors";
 type Db = PrismaClient;
 
 /**
- * Reserves Regina's Table for two (the guest and a +1) with a main course each. Free ($0), so no
- * simulated charge is made. Seats are reserved atomically by createBooking; a guest can hold only
- * one reservation, so a double submission can never book twice.
+ * Reserves 1 seat up to the seats left, with a main course for each guest. Free ($0), so no
+ * simulated charge is made. Seats are reserved atomically by createBooking, so capacity can never
+ * be exceeded; a guest holds one reservation, so a double submission can never book twice.
  */
 export async function reserveReginasTable(db: Db, guestId: string, input: ReginaReservationInput, now: Date) {
-  if (input.sessionId !== REGINA_SESSION_ID) throw new DomainError("This reservation is only for Regina's Table.", "CONFLICT");
-  const mains = [reginaMainLabel(input.mainGuest), reginaMainLabel(input.mainPlusOne)];
+  if (input.sessionId !== REGINA_SESSION_ID) throw new DomainError("This reservation is only for Regina's Entrepreneurship Class Supper.", "CONFLICT");
+  const mains = Array.from({ length: input.ticketCount }, (_, i) => reginaMainLabel(input.mains[i] ?? ""));
   if (mains.some((m) => !m)) throw new DomainError("Choose a main course for each guest.");
   return createBooking(
     db,
     {
       guestId,
       sessionId: input.sessionId,
-      ticketCount: REGINA_PARTY_SIZE,
+      ticketCount: input.ticketCount,
       contactName: input.contactName,
       contactEmail: input.contactEmail,
       dietaryRequirements: input.dietaryRequirements,
-      attendees: [
-        { name: input.contactName, mealChoice: mains[0] },
-        { name: input.plusOneName || null, mealChoice: mains[1] },
-      ],
+      attendees: mains.map((mealChoice, i) => ({ name: i === 0 ? input.contactName : input.guestNames[i] || null, mealChoice })),
       acknowledgedPolicy: true,
       onePerGuest: true,
     },
@@ -40,7 +36,7 @@ export async function reserveReginasTable(db: Db, guestId: string, input: Regina
   );
 }
 
-/** The signed-in guest's active reservation for Regina's Table, if any. */
+/** The signed-in guest's active reservation for Regina's event, if any. */
 export function findReginaReservation(db: Db, guestId: string) {
   return db.booking.findFirst({
     where: { sessionId: REGINA_SESSION_ID, guestId, status: { in: ["CONFIRMED", "PENDING"] } },
@@ -57,7 +53,7 @@ export function findReginaReservation(db: Db, guestId: string) {
 export async function resetReginasTableDemo(db: Db) {
   return db.$transaction(async (tx) => {
     const session = await tx.experienceSession.findUnique({ where: { id: REGINA_SESSION_ID } });
-    if (!session) throw new DomainError("Regina's Table isn't in this database yet. Run npm run demo:regina.", "NOT_FOUND");
+    if (!session) throw new DomainError("Regina's event isn't in this database yet. Run npm run demo:regina.", "NOT_FOUND");
     const demo = await tx.booking.findMany({
       where: { sessionId: REGINA_SESSION_ID, NOT: { id: { startsWith: REGINA_SEEDED_BOOKING_PREFIX } } },
       select: { id: true },

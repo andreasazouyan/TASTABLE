@@ -48,7 +48,7 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
   const lateFee = terms.kind === "LATE_FEE" ? lateFeeCents(b.subtotalCents, terms.lateFeePercent) : null;
   const revealAddress = !e.venue.isSecretLocation || b.session.startsAt.getTime() - now.getTime() <= 24 * 3_600_000;
   const regina = isReginasTable(e.slug);
-  const meals = b.tickets.map((t, i) => `${t.attendeeName ?? (i === 0 ? "You" : "Your +1")}: ${t.mealChoice ?? "Not chosen"}`);
+  const meals = b.tickets.map((t, i) => `${t.attendeeName ?? (i === 0 ? "You" : `Guest ${i + 1}`)}: ${t.mealChoice ?? "Not chosen"}`);
 
   return (
     <div className="container-page max-w-5xl pt-6 sm:pt-10">

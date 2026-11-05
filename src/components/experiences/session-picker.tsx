@@ -43,7 +43,7 @@ export function SessionPicker({
   sessions: PickerSession[];
   initialId?: string;
   path: string;
-  /** Optional overrides for events with their own reservation flow (e.g. Regina's Table, pairs only). */
+  /** Optional overrides for events with their own reservation flow (e.g. Regina's free event). */
   bookLabel?: string;
   seatNoun?: "spot" | "seat";
   minSeats?: number;
@@ -133,7 +133,7 @@ export function SessionPicker({
                   >
                     <Minus aria-hidden />
                   </Button>
-                  <output aria-live="polite" aria-label="Guests" className="w-8 text-center text-lg font-semibold tabular-nums" data-testid="seat-count">
+                  <output aria-live="polite" aria-label="Guests" className="w-8 text-center text-lg font-semibold tabular-nums" data-testid="card-seat-count">
                     {seats}
                   </output>
                   <Button

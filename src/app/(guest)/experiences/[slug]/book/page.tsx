@@ -19,7 +19,7 @@ import { dietaryLabel } from "@/lib/domain/taxonomy";
 import { formatDate, formatTime } from "@/lib/format";
 import { requestNow } from "@/lib/request-clock";
 import { ReginaReservationForm } from "@/components/booking/regina-reservation-form";
-import { isReginasTable, REGINA_CONFIRMED_TITLE, REGINA_PARTY_SIZE } from "@/lib/domain/reginas-table";
+import { isReginasTable, REGINA_CONFIRMED_TITLE } from "@/lib/domain/reginas-table";
 import { findReginaReservation } from "@/server/services/reginas-table";
 
 export const metadata: Metadata = { title: "Checkout" };
@@ -51,7 +51,7 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
   const left = seatsLeft(session);
   const regina = isReginasTable(exp.slug);
   const reginaReservation = regina ? await findReginaReservation(db, guest.id) : null;
-  const open = (state === "AVAILABLE" || state === "LIMITED") && (!regina || left >= REGINA_PARTY_SIZE);
+  const open = state === "AVAILABLE" || state === "LIMITED";
 
   return (
     <div className="container-page pt-6 sm:pt-10">
@@ -75,7 +75,7 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
       </div>
 
       {reginaReservation ? (
-        <EmptyState title={REGINA_CONFIRMED_TITLE} description="You already have a reservation for 2 at Regina's Table.">
+        <EmptyState title={REGINA_CONFIRMED_TITLE} description={`You already have a reservation for this event.`}>
           <Button asChild>
             <Link href={`/bookings/${reginaReservation.reference}`}>See your reservation</Link>
           </Button>
@@ -84,6 +84,7 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
         <ReginaReservationForm
           sessionId={session.id}
           seatsLeft={left}
+          initialSeats={typeof sp.seats === "string" ? Number(sp.seats) : 1}
           dateLabel={formatDate(session.startsAt, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
           timeLabel={`${formatTime(session.startsAt)} – ${formatTime(session.endsAt)}`}
           venueName={exp.venue.name}
