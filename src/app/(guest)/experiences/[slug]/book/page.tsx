@@ -36,7 +36,9 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
   const { slug } = await params;
   const sp = await searchParams;
   const sessionId = typeof sp.session === "string" ? sp.session : "";
-  const { user, guest } = await requireGuest(`/experiences/${slug}/book?session=${sessionId}`);
+  // Seat quantity chosen on the event page; clamped again in the form and re-validated on the server.
+  const requestedSeats = typeof sp.seats === "string" ? sp.seats : undefined;
+  const { user, guest } = await requireGuest(`/experiences/${slug}/book?session=${sessionId}${requestedSeats ? `&seats=${encodeURIComponent(requestedSeats)}` : ""}`);
   const now = await requestNow();
 
   const session = await db.experienceSession.findFirst({
@@ -94,6 +96,7 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
           sessionId={session.id}
           unitPriceCents={sessionUnitPrice(session, exp)}
           seatsLeft={left}
+          initialSeats={requestedSeats}
           policyName={STANDARD_LATE_FEE_TERMS.name}
           policyLines={describeTerms(STANDARD_LATE_FEE_TERMS)}
           defaultName={user.name}

@@ -95,6 +95,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
     dateLabel: formatDate(s.startsAt, { weekday: "long", month: "long", day: "numeric" }),
     timeLabel: `${formatTime(s.startsAt)} – ${formatTime(s.endsAt)}`,
     priceLabel: formatPrice(sessionUnitPrice(s, exp)),
+    unitPriceCents: sessionUnitPrice(s, exp),
     seatsLeft: seatsLeft(s),
     availability: availability(s, now),
     waitlisted: waitlistedIds.has(s.id),
@@ -355,7 +356,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </Link>
               </div>
             ) : regina ? (
-              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} bookLabel={REGINA_BOOK_LABEL} seatNoun="seat" minSeats={REGINA_PARTY_SIZE} />
+              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} bookLabel={REGINA_BOOK_LABEL} seatNoun="seat" minSeats={REGINA_PARTY_SIZE} fixedSeats={REGINA_PARTY_SIZE} />
             ) : (
               <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} />
             )}
