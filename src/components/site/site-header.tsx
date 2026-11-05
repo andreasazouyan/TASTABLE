@@ -3,12 +3,13 @@ import { Suspense } from "react";
 import { GuestNavLinks } from "@/components/site/guest-nav-links";
 import { Logo } from "@/components/site/logo";
 import { MobileMenu } from "@/components/site/mobile-menu";
+import { NotificationBell } from "@/components/site/notification-bell";
 import { ModeSwitch } from "@/components/site/mode-switch";
 import { UserMenu, UserMenuFallback } from "@/components/site/user-menu";
 
 /**
  * Guest header: logo, primary tabs (Home, Discover, Calendar, Saved, My Bookings), then the
- * mode switch, and the profile/avatar button kept apart at the far top right.
+ * mode switch, the notifications bell, and the profile/avatar button kept apart at the far top right.
  */
 export function SiteHeader() {
   return (
@@ -22,6 +23,9 @@ export function SiteHeader() {
           <ModeSwitch mode="guest" className="hidden xl:inline-flex" />
           <MobileMenu />
           <span aria-hidden className="hidden h-6 w-px bg-border md:block" />
+          <Suspense fallback={null}>
+            <NotificationBell />
+          </Suspense>
           <Suspense fallback={<UserMenuFallback className="h-9 w-9 rounded-full bg-muted sm:w-24" />}>
             <UserMenu dropdown />
           </Suspense>

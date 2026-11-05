@@ -27,3 +27,14 @@ test("guest navigation: Home, Discover, Calendar, Saved, My Bookings, each openi
   await expect(page).toHaveURL(/\/profile$/);
   await expect(nav.locator("[aria-current=page]")).toHaveCount(0);
 });
+
+test("guest header: notifications bell opens in-app reminders", async ({ page }) => {
+  await signInAs(page, /Zoe/);
+  await page.goto("/discover");
+  await page.getByRole("button", { name: /^Notifications/ }).click();
+  const panel = page.getByRole("dialog", { name: "Notifications" });
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("In-app only");
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+});
