@@ -24,12 +24,29 @@ export type PickerSession = {
  * Session selection + Book / Join waitlist. Sold-out sessions can never be booked here;
  * the server re-validates capacity on checkout anyway.
  */
-export function SessionPicker({ slug, sessions, initialId, path }: { slug: string; sessions: PickerSession[]; initialId?: string; path: string }) {
+export function SessionPicker({
+  slug,
+  sessions,
+  initialId,
+  path,
+  bookLabel = "Book now",
+  seatNoun = "spot",
+  minSeats = 1,
+}: {
+  slug: string;
+  sessions: PickerSession[];
+  initialId?: string;
+  path: string;
+  /** Optional overrides for events with their own reservation flow (e.g. Regina's Table, pairs only). */
+  bookLabel?: string;
+  seatNoun?: "spot" | "seat";
+  minSeats?: number;
+}) {
   const firstOpen = sessions.find((s) => s.availability === "AVAILABLE" || s.availability === "LIMITED");
   const [selected, setSelected] = useState(sessions.find((s) => s.id === initialId)?.id ?? firstOpen?.id ?? sessions[0]?.id);
   const [state, action, pending] = useActionState(joinWaitlistAction, null);
   const current = sessions.find((s) => s.id === selected);
-  const bookable = current && (current.availability === "AVAILABLE" || current.availability === "LIMITED");
+  const bookable = current && (current.availability === "AVAILABLE" || current.availability === "LIMITED") && current.seatsLeft >= minSeats;
 
   if (!sessions.length) return <p className="text-sm text-muted-foreground">No upcoming dates yet. Save it to hear when new dates are added.</p>;
 
@@ -68,7 +85,7 @@ export function SessionPicker({ slug, sessions, initialId, path }: { slug: strin
                 <span className="text-right">
                   <span className="block text-sm font-medium">{s.priceLabel}</span>
                   <span className={cn("text-xs", soldOut ? "text-foreground" : s.availability === "LIMITED" ? "text-brand" : "text-muted-foreground")}>
-                    {s.availability === "CANCELLED" ? "Cancelled" : spotsText(s.seatsLeft, s.availability)}
+                    {s.availability === "CANCELLED" ? "Cancelled" : spotsText(s.seatsLeft, s.availability, seatNoun)}
                   </span>
                 </span>
               </label>
@@ -80,7 +97,7 @@ export function SessionPicker({ slug, sessions, initialId, path }: { slug: strin
       <div className="mt-5">
         {bookable ? (
           <Button asChild variant="brand" size="lg" className="w-full">
-            <Link href={`/experiences/${slug}/book?session=${current.id}`}>Book now</Link>
+            <Link href={`/experiences/${slug}/book?session=${current.id}`}>{bookLabel}</Link>
           </Button>
         ) : current?.availability === "SOLD_OUT" ? (
           current.waitlisted ? (

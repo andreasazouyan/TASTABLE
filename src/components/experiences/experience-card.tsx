@@ -7,6 +7,7 @@ import { SaveButton } from "@/components/experiences/save-button";
 import { Photo } from "@/components/site/photo";
 import { SampleBadge } from "@/components/site/sample-badge";
 import { getCategory } from "@/lib/domain/categories";
+import { isReginasTable } from "@/lib/domain/reginas-table";
 import type { ListingMatch } from "@/lib/discovery/types";
 import { formatDateTime, formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -57,7 +58,7 @@ export function ExperienceCard({
         </div>
         <SaveButton experienceId={listing.id} saved={saved} saveCount={listing.saves ?? 0} title={listing.title} className="absolute top-3 right-3 z-10" />
         {session && (
-          <AvailabilityPill seatsLeft={session.seatsLeft} availability={session.availability} className="absolute bottom-3 left-3" />
+          <AvailabilityPill seatsLeft={session.seatsLeft} availability={session.availability} noun={isReginasTable(listing.slug) ? "seat" : "spot"} className="absolute bottom-3 left-3" />
         )}
       </div>
 

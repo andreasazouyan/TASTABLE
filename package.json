@@ -22,6 +22,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo:reset": "prisma migrate deploy && prisma db seed",
+    "demo:regina": "tsx scripts/reginas-table.ts",
     "images:check": "tsx scripts/check-images.ts",
     "images:apply": "tsx scripts/apply-event-images.ts"
   },

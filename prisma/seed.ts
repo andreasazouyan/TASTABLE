@@ -30,6 +30,7 @@ import {
 } from "./seed-data";
 import { seedFoundation } from "./seed-foundation";
 import { reminderTime } from "../src/lib/booking/cancellation";
+import { seedReginasTable } from "./seed-regina";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -591,8 +592,12 @@ async function main() {
     data: upcomingBookings.map((b) => ({ id: `rem_${b.id}`, bookingId: b.id, remindAt: reminderTime(b.session.startsAt), createdAt: NOW })),
   });
 
+  // Regina's Table: the one-time demo event on a fixed date (own step, no RNG; see seed-regina.ts).
+  const regina = await seedReginasTable(db, NOW);
+
   const counts = {
     ...foundation,
+    reginasTable: regina,
     users: await db.user.count(),
     hosts: await db.hostProfile.count(),
     venues: await db.venue.count(),

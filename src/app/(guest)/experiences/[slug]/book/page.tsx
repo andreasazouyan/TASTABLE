@@ -18,6 +18,9 @@ import { parseList } from "@/lib/domain/lists";
 import { dietaryLabel } from "@/lib/domain/taxonomy";
 import { formatDate, formatTime } from "@/lib/format";
 import { requestNow } from "@/lib/request-clock";
+import { ReginaReservationForm } from "@/components/booking/regina-reservation-form";
+import { isReginasTable, REGINA_CONFIRMED_TITLE, REGINA_PARTY_SIZE } from "@/lib/domain/reginas-table";
+import { findReginaReservation } from "@/server/services/reginas-table";
 
 export const metadata: Metadata = { title: "Checkout" };
 
@@ -33,7 +36,7 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
   const { slug } = await params;
   const sp = await searchParams;
   const sessionId = typeof sp.session === "string" ? sp.session : "";
-  const { user } = await requireGuest(`/experiences/${slug}/book?session=${sessionId}`);
+  const { user, guest } = await requireGuest(`/experiences/${slug}/book?session=${sessionId}`);
   const now = await requestNow();
 
   const session = await db.experienceSession.findFirst({
@@ -44,6 +47,9 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
   const exp = session.experience;
   const state = availability(session, now);
   const left = seatsLeft(session);
+  const regina = isReginasTable(exp.slug);
+  const reginaReservation = regina ? await findReginaReservation(db, guest.id) : null;
+  const open = (state === "AVAILABLE" || state === "LIMITED") && (!regina || left >= REGINA_PARTY_SIZE);
 
   return (
     <div className="container-page pt-6 sm:pt-10">
@@ -53,7 +59,7 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
       <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center">
         <Photo src={exp.photos[0]?.url} alt={exp.photos[0]?.alt ?? exp.title} theme="terracotta" sizes="160px" className="aspect-[4/3] w-full shrink-0 rounded-xl sm:w-40" />
         <div>
-          <p className="eyebrow mb-1">Demo checkout</p>
+          <p className="eyebrow mb-1">{regina ? "Reserve your seats" : "Demo checkout"}</p>
           <h1 className="text-3xl sm:text-4xl">{exp.title}</h1>
           <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
@@ -66,7 +72,24 @@ async function Checkout({ params, searchParams }: PageProps<"/experiences/[slug]
         </div>
       </div>
 
-      {state === "AVAILABLE" || state === "LIMITED" ? (
+      {reginaReservation ? (
+        <EmptyState title={REGINA_CONFIRMED_TITLE} description="You already have a reservation for 2 at Regina's Table.">
+          <Button asChild>
+            <Link href={`/bookings/${reginaReservation.reference}`}>See your reservation</Link>
+          </Button>
+        </EmptyState>
+      ) : regina && open ? (
+        <ReginaReservationForm
+          sessionId={session.id}
+          seatsLeft={left}
+          dateLabel={formatDate(session.startsAt, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+          timeLabel={`${formatTime(session.startsAt)} – ${formatTime(session.endsAt)}`}
+          venueName={exp.venue.name}
+          venueAddress={exp.venue.addressLine}
+          defaultName={user.name}
+          defaultEmail={user.email}
+        />
+      ) : open ? (
         <CheckoutForm
           sessionId={session.id}
           unitPriceCents={sessionUnitPrice(session, exp)}

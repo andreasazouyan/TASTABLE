@@ -18,6 +18,7 @@ import { BOOKED_POLICY_NOTICE, describeTerms, formatTimeRemaining, lateFeeCents,
 import { formatDate, formatDateTime, formatMoney, formatTime } from "@/lib/format";
 import { requestNow } from "@/lib/request-clock";
 import { getBookingByReference } from "@/server/queries/bookings";
+import { isReginasTable, REGINA_CONFIRMED_TITLE, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
 
 export const metadata: Metadata = { title: "Your ticket" };
 
@@ -46,6 +47,8 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
   const q = quoteCancellation(b, terms, b.session.startsAt, now);
   const lateFee = terms.kind === "LATE_FEE" ? lateFeeCents(b.subtotalCents, terms.lateFeePercent) : null;
   const revealAddress = !e.venue.isSecretLocation || b.session.startsAt.getTime() - now.getTime() <= 24 * 3_600_000;
+  const regina = isReginasTable(e.slug);
+  const meals = b.tickets.map((t, i) => `${t.attendeeName ?? (i === 0 ? "You" : "Your +1")}: ${t.mealChoice ?? "Not chosen"}`);
 
   return (
     <div className="container-page max-w-5xl pt-6 sm:pt-10">
@@ -61,14 +64,38 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
           dateLabel={formatDate(b.session.startsAt, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
           timeLabel={`${formatTime(b.session.startsAt)} – ${formatTime(b.session.endsAt)}`}
           tickets={b.ticketCount}
-          totalLabel={formatMoney(b.totalPriceCents)}
-          policyNotice={terms.kind === "LATE_FEE" ? BOOKED_POLICY_NOTICE : null}
-          feeSentence={lateFee !== null ? `For your ${formatMoney(b.subtotalCents)} booking, the late cancellation fee would be ${formatMoney(lateFee)}.` : null}
+          totalLabel={regina ? `${formatMoney(b.totalPriceCents)} · complimentary` : formatMoney(b.totalPriceCents)}
+          policyNotice={!regina && terms.kind === "LATE_FEE" ? BOOKED_POLICY_NOTICE : null}
+          feeSentence={!regina && lateFee !== null ? `For your ${formatMoney(b.subtotalCents)} booking, the late cancellation fee would be ${formatMoney(lateFee)}.` : null}
           icsHref={`/api/bookings/${b.reference}/ics`}
+          {...(regina
+            ? {
+                heading: REGINA_CONFIRMED_TITLE,
+                ticketsTitle: "Guests",
+                totalTitle: "Total",
+                extraRows: [
+                  { label: "Venue", value: `${e.venue.name}, ${e.venue.addressLine}` },
+                  { label: "Main courses", value: meals.join(" · ") },
+                  { label: "Reservation", value: b.reference },
+                ],
+              }
+            : {})}
         />
       )}
 
-      {sp.confirmed && active && (
+      {sp.confirmed && active && regina && (
+        <div role="status" className="mb-8 flex items-start gap-3 rounded-2xl bg-[#e5eddc] p-5 text-[#2f3d24]">
+          <CircleCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
+          <div>
+            <p className="font-medium">
+              {REGINA_CONFIRMED_TITLE} Reservation {b.reference} for {b.ticketCount} guests is confirmed.
+            </p>
+            <p className="text-sm">{REGINA_PRICE_NOTE}. Total {formatMoney(b.totalPriceCents)}, nothing to pay. Your tickets and main courses are below.</p>
+          </div>
+        </div>
+      )}
+
+      {sp.confirmed && active && !regina && (
         <div role="status" className="mb-8 flex items-start gap-3 rounded-2xl bg-[#e5eddc] p-5 text-[#2f3d24]">
           <CircleCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
           <div>
@@ -134,8 +161,15 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
                         <dt className="text-muted-foreground">Venue</dt>
                         <dd>
                           {e.venue.isSecretLocation && !revealAddress ? "Secret location" : e.venue.name}, {e.venue.neighborhood}
+                          {!e.venue.isFictional && <span className="block text-muted-foreground">{e.venue.addressLine}</span>}
                         </dd>
                       </div>
+                      {t.mealChoice && (
+                        <div className="col-span-2">
+                          <dt className="text-muted-foreground">Main course</dt>
+                          <dd data-testid="meal-choice">{t.mealChoice}</dd>
+                        </div>
+                      )}
                       <div>
                         <dt className="text-muted-foreground">Ticket status</dt>
                         <dd>

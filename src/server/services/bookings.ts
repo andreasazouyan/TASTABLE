@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { availability, seatsLeft } from "@/lib/booking/capacity";
-import { bookingReference, ticketCode } from "@/lib/booking/codes";
+import { bookingReference, simulatedPaymentReference, ticketCode } from "@/lib/booking/codes";
 import { simulateCharge } from "@/lib/booking/payment";
 import { quote, sessionUnitPrice } from "@/lib/booking/pricing";
 import { LATE_FEE_POLICY_KEY, quoteCancellation, reminderTime, termsFromPolicy, termsFromSnapshot, termsSnapshot, type CancellationQuote } from "@/lib/booking/cancellation";
@@ -15,8 +15,10 @@ export type CreateBookingInput = {
   contactName: string;
   contactEmail: string;
   dietaryRequirements?: string | null;
-  attendees?: { name?: string | null; dietaryNotes?: string | null }[];
+  attendees?: { name?: string | null; dietaryNotes?: string | null; mealChoice?: string | null }[];
   acknowledgedPolicy: boolean;
+  /** Reject a second active booking by the same guest for the session (e.g. a guest list event). */
+  onePerGuest?: boolean;
 };
 
 /**
@@ -56,7 +58,15 @@ export async function createBooking(db: Db, input: CreateBookingInput, now: Date
       );
     }
 
-    const charge = simulateCharge(price.totalCents);
+    // Checked after the seat UPDATE: its row lock serialises concurrent requests for this session,
+    // so a double submission sees the first booking once it commits, and this rollback frees the seats.
+    if (input.onePerGuest) {
+      const existing = await tx.booking.count({ where: { sessionId: session.id, guestId: input.guestId, status: { in: ["CONFIRMED", "PENDING"] } } });
+      if (existing > 0) throw new DomainError("You're already on the guest list for this event.", "CONFLICT");
+    }
+
+    // Complimentary events ($0) need no simulated charge, only a reference for the record.
+    const charge = price.totalCents === 0 ? { ok: true as const, reference: simulatedPaymentReference() } : simulateCharge(price.totalCents);
     if (!charge.ok) throw new DomainError(`Simulated payment failed: ${charge.reason}`, "PAYMENT_FAILED");
 
     // New bookings accept Tastable's standard late-fee terms; the accepted terms are stored on the
@@ -92,6 +102,7 @@ export async function createBooking(db: Db, input: CreateBookingInput, now: Date
             code: ticketCode(),
             attendeeName: i === 0 ? input.contactName : attendees[i]?.name || null,
             dietaryNotes: attendees[i]?.dietaryNotes || null,
+            mealChoice: attendees[i]?.mealChoice || null,
           })),
         },
       },
