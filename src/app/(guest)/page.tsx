@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 
-import { CardRow, CardRowItem } from "@/components/experiences/card-row";
+import { Carousel, CarouselItem } from "@/components/experiences/carousel";
 import { ExperienceCard } from "@/components/experiences/experience-card";
 import { Photo } from "@/components/site/photo";
 import { SearchBar } from "@/components/site/search-bar";
@@ -13,21 +13,18 @@ import { getCurrentUser } from "@/lib/auth/demo";
 import { requestNow } from "@/lib/request-clock";
 import { CATEGORIES } from "@/lib/domain/categories";
 import { PHOTOS, type PhotoKey } from "@/lib/domain/photos";
-import { COLLECTIONS, applyFilters, filtersSchema, type CollectionKey } from "@/lib/discovery/filters";
+import { areaRow, categoryCounts, featuredRow, HOME_ROW_SIZE, popularRow, starterRow, upcomingForHome } from "@/lib/discovery/home-sections";
+import type { ListingMatch } from "@/lib/discovery/types";
 import { getSavedIds } from "@/server/queries/guest";
-import { getListings, getMarketplaceStats } from "@/server/queries/listings";
+import { getListings } from "@/server/queries/listings";
 import { getRecommendations } from "@/server/queries/recommendations";
 
 export default function HomePage() {
   return (
     <>
       <Hero />
-      <Categories />
-      <Suspense fallback={<RowSkeleton title="Recommended for You" />}>
-        <RecommendedForYou />
-      </Suspense>
-      <Suspense fallback={<RowSkeleton title="Curated collections" />}>
-        <Collections />
+      <Suspense fallback={<HomeSkeleton />}>
+        <HomeSections />
       </Suspense>
       <HostBand />
     </>
@@ -64,18 +61,201 @@ function Hero() {
   );
 }
 
-function Categories() {
+/** Everything below the hero reads one set of listings, the same data Discover and Calendar use. */
+async function HomeSections() {
+  const now = await requestNow();
+  const [listings, user] = await Promise.all([getListings(now.toISOString()), getCurrentUser()]);
+  const prefs = user?.guestProfile?.preferences ?? null;
+  const onboarded = !!prefs?.onboardingCompletedAt;
+  const [saved, recs] = await Promise.all([
+    getSavedIds(user?.guestProfile?.id),
+    onboarded && prefs ? getRecommendations(prefs, now, HOME_ROW_SIZE) : Promise.resolve(null),
+  ]);
+
+  const upcoming = upcomingForHome(listings, now);
+  const counts = categoryCounts(upcoming);
+  const popular = popularRow(upcoming);
+  const area = areaRow(upcoming, prefs?.locationKey);
+  const featured = featuredRow(upcoming);
+  const firstName = user?.name.split(" ")[0];
+
   return (
-    <section aria-labelledby="categories-title" className="container-page mt-16 sm:mt-24">
-      <SectionHeading id="categories-title" eyebrow="Four ways in" title="What are you in the mood for?" />
+    <div className="mt-16 space-y-16 sm:mt-24 sm:space-y-24">
+      <Categories counts={counts} />
+
+      <section className="container-page" aria-labelledby="recommended-title">
+        <SectionHeading
+          id="recommended-title"
+          eyebrow="Recommended for you"
+          title={recs && firstName ? `Picked for you, ${firstName}` : "Recommended for You"}
+          description={
+            recs
+              ? "Ranked by simple rules from your experience types, days and times, neighborhood, budget and who you go with. Each card says why it's here."
+              : "A taste of every category to start with. Tell us what you like and this row becomes yours."
+          }
+          href="/discover?sort=recommended"
+          linkLabel="See all"
+        />
+        {recs ? (
+          recs.length ? (
+            <Carousel label="Recommended for you">
+              {recs.map((r, i) => (
+                <CarouselItem key={r.listing.id}>
+                  <ExperienceCard
+                    listing={r.listing}
+                    saved={saved.has(r.listing.id)}
+                    reason={`Why: ${r.reasons.slice(0, 2).join(" · ")}`}
+                    priority={i < 2}
+                  />
+                </CarouselItem>
+              ))}
+            </Carousel>
+          ) : (
+            <p className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+              Nothing is bookable within your limits right now. Try adjusting your budget or travel answers in{" "}
+              <Link href="/profile#preferences" className="text-brand underline">
+                your preferences
+              </Link>
+              .
+            </p>
+          )
+        ) : (
+          <>
+            <PersonaliseNudge signedIn={!!user} />
+            <Carousel label="Recommended for you">
+              {starterRow(upcoming).map((l, i) => (
+                <CarouselItem key={l.id}>
+                  <ExperienceCard listing={l} saved={saved.has(l.id)} priority={i < 2} />
+                </CarouselItem>
+              ))}
+            </Carousel>
+          </>
+        )}
+        {recs && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Not quite right?{" "}
+            <Link href="/profile#preferences" className="text-foreground underline underline-offset-4">
+              Edit your preferences
+            </Link>
+            .
+          </p>
+        )}
+      </section>
+
+      <HomeRow
+        id="popular"
+        eyebrow="Most saved"
+        title="Popular in NYC"
+        description="Ranked by how many guests saved each experience, most saved first. Save counts on sample listings come from simulated demo guests."
+        href="/discover?sort=popular"
+        items={popular}
+        saved={saved}
+        badge={(_, i) => `#${i + 1}`}
+      />
+
+      <HomeRow
+        id="area"
+        eyebrow={area.borough ? "Near you" : "Around the five boroughs"}
+        title={area.title}
+        description={
+          area.borough
+            ? "A spread of neighborhoods in your borough, from the area you chose when you set up Tastable."
+            : "A few experiences from across the city. Add your neighborhood in your preferences to see your borough here."
+        }
+        href={area.href}
+        items={area.items}
+        saved={saved}
+      />
+
+      <HomeRow
+        id="featured"
+        eyebrow="Hand-picked"
+        title="Featured Experiences"
+        description="A small selection our team is excited about this season."
+        href="/discover?collection=featured"
+        items={featured}
+        saved={saved}
+        badge={() => "Featured"}
+      />
+    </div>
+  );
+}
+
+function HomeRow({
+  id,
+  eyebrow,
+  title,
+  description,
+  href,
+  items,
+  saved,
+  badge,
+}: {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  href: string;
+  items: ListingMatch[];
+  saved: Set<string>;
+  badge?: (l: ListingMatch, i: number) => string | undefined;
+}) {
+  if (!items.length) return null;
+  return (
+    <section className="container-page" aria-labelledby={`${id}-title`}>
+      <SectionHeading id={`${id}-title`} eyebrow={eyebrow} title={title} description={description} href={href} linkLabel="See all" />
+      <Carousel label={title}>
+        {items.map((l, i) => (
+          <CarouselItem key={l.id}>
+            <ExperienceCard listing={l} saved={saved.has(l.id)} badge={badge?.(l, i)} />
+          </CarouselItem>
+        ))}
+      </Carousel>
+    </section>
+  );
+}
+
+function PersonaliseNudge({ signedIn }: { signedIn: boolean }) {
+  return (
+    <div className="mb-6 flex flex-col items-start gap-4 rounded-2xl border bg-card p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      <div className="flex gap-4">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-accent-foreground">
+          <Sparkles className="size-5" aria-hidden />
+        </span>
+        <p className="max-w-xl text-sm text-muted-foreground">
+          <span className="block font-medium text-foreground">Get recommendations that explain themselves</span>
+          Tell us where you are, when you like to go out, your budget and what you love to eat. Six quick steps, and you can skip any time.
+        </p>
+      </div>
+      <Button asChild variant="default">
+        <Link href={signedIn ? "/onboarding" : "/sign-in?next=/onboarding"}>
+          Personalise Tastable <ArrowRight aria-hidden />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+function Categories({ counts }: { counts: Record<string, number> }) {
+  return (
+    <section aria-labelledby="categories-title" className="container-page">
+      <SectionHeading
+        id="categories-title"
+        eyebrow="Browse by category"
+        title="What are you in the mood for?"
+        href="/discover"
+        linkLabel="See all"
+      />
       <ul className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
         {CATEGORIES.map((c) => {
           const Icon = c.icon;
           const photo = PHOTOS[c.photo as PhotoKey];
+          const n = counts[c.id] ?? 0;
           return (
             <li key={c.id}>
               <Link
                 href={`/discover?category=${c.slug}`}
+                aria-label={`${c.name}: ${n} upcoming ${n === 1 ? "experience" : "experiences"}`}
                 className="group relative isolate flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-2xl p-4 text-white shadow-soft transition-shadow duration-300 hover:shadow-lift focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:aspect-[4/5] sm:p-5"
               >
                 <Photo
@@ -87,6 +267,9 @@ function Categories() {
                   imageClassName="group-hover:scale-[1.04]"
                 />
                 <span aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                <span className="absolute top-3 right-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur sm:top-4 sm:right-4">
+                  {n} upcoming
+                </span>
                 <Icon className="mb-3 size-5 text-white/90" strokeWidth={1.5} aria-hidden />
                 <span className="font-display text-lg leading-tight sm:text-[1.35rem]">{c.name}</span>
                 <span className="mt-1.5 hidden text-sm text-white/80 sm:block">{c.description}</span>
@@ -96,106 +279,6 @@ function Categories() {
         })}
       </ul>
     </section>
-  );
-}
-
-async function RecommendedForYou() {
-  const user = await getCurrentUser();
-  const prefs = user?.guestProfile?.preferences;
-  if (!user || !prefs?.onboardingCompletedAt) {
-    return (
-      <section className="container-page mt-16 sm:mt-24" aria-labelledby="personalise-title">
-        <div className="flex flex-col items-start gap-5 rounded-2xl border bg-card p-6 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-8">
-          <div className="flex gap-4">
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-soft text-accent-foreground">
-              <Sparkles className="size-5" aria-hidden />
-            </span>
-            <div>
-              <h2 id="personalise-title" className="text-xl">
-                Get recommendations that explain themselves
-              </h2>
-              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                Tell us where you are, when you like to go out and what you love to eat. Six quick steps, and you can skip any time.
-              </p>
-            </div>
-          </div>
-          <Button asChild variant="default">
-            <Link href={user ? "/onboarding" : "/sign-in?next=/onboarding"}>
-              Personalise Tastable <ArrowRight aria-hidden />
-            </Link>
-          </Button>
-        </div>
-      </section>
-    );
-  }
-
-  const now = await requestNow();
-  const [recs, saved] = await Promise.all([getRecommendations(prefs, now, 4), getSavedIds(user.guestProfile?.id)]);
-  return (
-    <section className="container-page mt-16 sm:mt-24" aria-labelledby="recommended-title">
-      <SectionHeading
-        id="recommended-title"
-        eyebrow="Recommended for you"
-        title={`Picked for you, ${user.name.split(" ")[0]}`}
-        description="Ranked by simple rules from your preferences. Each card says why it's here."
-        href="/profile#preferences"
-        linkLabel="Edit preferences"
-      />
-      {recs.length ? (
-        <CardRow label="Recommended for you">
-          {recs.map((r) => (
-            <CardRowItem key={r.listing.id}>
-              <ExperienceCard listing={r.listing} saved={saved.has(r.listing.id)} reason={`Why: ${r.reasons.slice(0, 2).join(" · ")}`} />
-            </CardRowItem>
-          ))}
-        </CardRow>
-      ) : (
-        <p className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-          Nothing is bookable within your limits right now. Try adjusting your budget or travel answers in{" "}
-          <Link href="/profile#preferences" className="text-brand underline">
-            your preferences
-          </Link>
-          .
-        </p>
-      )}
-    </section>
-  );
-}
-
-async function Collections() {
-  const now = await requestNow();
-  const [listings, user, stats] = await Promise.all([getListings(now.toISOString()), getCurrentUser(), getMarketplaceStats()]);
-  const saved = await getSavedIds(user?.guestProfile?.id);
-  // Prefer listings not already shown in an earlier collection, so rows feel distinct.
-  const shown = new Set<string>();
-  const collections = COLLECTIONS.map((c) => {
-    const matches = applyFilters(listings, filtersSchema.parse({ collection: c.key }), now);
-    const items = [...matches.filter((m) => !shown.has(m.id)), ...matches.filter((m) => shown.has(m.id))].slice(0, 4);
-    items.forEach((m) => shown.add(m.id));
-    return { ...c, items };
-  }).filter((c) => c.items.length > 0);
-
-  return (
-    <div className="mt-16 space-y-16 sm:mt-24 sm:space-y-24">
-      {collections.map((c, i) => (
-        <section key={c.key} className="container-page" aria-labelledby={`col-${c.key}`}>
-          <SectionHeading
-            id={`col-${c.key}`}
-            eyebrow={i === 0 ? `${stats.experiences} sample experiences · ${stats.neighborhoods} neighborhoods` : undefined}
-            title={c.title}
-            description={c.blurb}
-            href={`/discover?collection=${c.key satisfies CollectionKey}`}
-          />
-          <CardRow label={c.title}>
-            {c.items.map((l, j) => (
-              <CardRowItem key={l.id}>
-                <ExperienceCard listing={l} saved={saved.has(l.id)} priority={i === 0 && j < 2} />
-              </CardRowItem>
-            ))}
-          </CardRow>
-        </section>
-      ))}
-    </div>
   );
 }
 
@@ -224,9 +307,9 @@ function HostBand() {
   );
 }
 
-function RowSkeleton({ title }: { title: string }) {
+function HomeSkeleton() {
   return (
-    <div className="container-page mt-16 sm:mt-24" aria-busy="true" aria-label={`Loading ${title}`}>
+    <div className="container-page mt-16 sm:mt-24" aria-busy="true" aria-label="Loading your Home page">
       <Skeleton className="mb-6 h-8 w-64" />
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (

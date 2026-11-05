@@ -29,6 +29,7 @@ export const SORTS = [
   { key: "price-asc", label: "Price: low to high" },
   { key: "price-desc", label: "Price: high to low" },
   { key: "spots", label: "Most spots left" },
+  { key: "popular", label: "Most saved" },
   { key: "newest", label: "Newest" },
 ] as const;
 export type SortKey = (typeof SORTS)[number]["key"];
@@ -44,6 +45,7 @@ export const COLLECTIONS = [
   { key: "creators-chefs", title: "Hosted by Creators & Chefs", blurb: "Private chefs, culinary pros and food creators." },
   { key: "limited", title: "Limited Spots", blurb: "Only a few seats left on the next date." },
   { key: "hidden-gems", title: "Hidden Gems in NYC", blurb: "Smaller hosts guests keep coming back to." },
+  { key: "featured", title: "Featured Experiences", blurb: "A handful of evenings our team picked out this season." },
 ] as const;
 export type CollectionKey = (typeof COLLECTIONS)[number]["key"];
 
@@ -130,6 +132,8 @@ export function inCollection(l: Listing, key: CollectionKey): boolean {
       return true; // handled by session availability
     case "hidden-gems":
       return l.host.followerCount < 10_000 && !l.featured;
+    case "featured":
+      return l.featured;
   }
 }
 
@@ -188,6 +192,11 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
   return sortListings(out, f.sort ?? (origin ? "recommended" : "recommended"));
 }
 
+/** Most saved first (unique savers), then recent views, then soonest date. */
+export function popularityOrder(a: Pick<Listing, "saves" | "views" | "slug">, b: Pick<Listing, "saves" | "views" | "slug">) {
+  return b.saves - a.saves || b.views - a.views || a.slug.localeCompare(b.slug);
+}
+
 export function sortListings(items: ListingMatch[], sort: SortKey): ListingMatch[] {
   const time = (x: ListingMatch) => x.matched?.startsAt.getTime() ?? Infinity;
   const price = (x: ListingMatch) => x.matched?.priceCents ?? x.ticketPriceCents;
@@ -204,6 +213,8 @@ export function sortListings(items: ListingMatch[], sort: SortKey): ListingMatch
         return price(b) - price(a) || a.slug.localeCompare(b.slug);
       case "spots":
         return (b.matched?.seatsLeft ?? 0) - (a.matched?.seatsLeft ?? 0) || a.slug.localeCompare(b.slug);
+      case "popular":
+        return popularityOrder(a, b);
       case "newest":
         return (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0) || a.slug.localeCompare(b.slug);
       default: {
