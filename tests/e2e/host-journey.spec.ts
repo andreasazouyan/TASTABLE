@@ -90,7 +90,7 @@ test("host: onboard, create and publish an event, it appears in discovery, a boo
   const timeline = guest.getByRole("region", { name: "Your Experience" });
   await expect(timeline.getByText("7:00 PM")).toBeVisible();
   await expect(timeline.getByText("Pull your own noodles")).toBeVisible();
-  await guest.getByRole("link", { name: "Book now" }).first().click();
+  await guest.getByRole("link", { name: /^Reserve \d+ seats?$/ }).first().click();
   await guest.getByRole("button", { name: "Add a ticket", exact: true }).click();
   await guest.getByRole("checkbox", { name: /cancellation policy/ }).check();
   await guest.getByRole("checkbox", { name: /simulated payment/ }).check();

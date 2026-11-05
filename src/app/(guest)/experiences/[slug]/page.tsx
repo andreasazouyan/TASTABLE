@@ -28,7 +28,7 @@ import { requestNow } from "@/lib/request-clock";
 import { db } from "@/lib/db";
 import { getExperienceDetail } from "@/server/queries/listings";
 import { ReginaResetPanel } from "@/components/booking/regina-reset-panel";
-import { demoToolsEnabled, isReginasTable, REGINA_BOOK_LABEL, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
+import { demoToolsEnabled, isReginasTable, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
 import { findReginaReservation } from "@/server/services/reginas-table";
 
 export default function ExperiencePage(props: PageProps<"/experiences/[slug]">) {
@@ -95,6 +95,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
     dateLabel: formatDate(s.startsAt, { weekday: "long", month: "long", day: "numeric" }),
     timeLabel: `${formatTime(s.startsAt)} – ${formatTime(s.endsAt)}`,
     priceLabel: formatPrice(sessionUnitPrice(s, exp)),
+    unitPriceCents: sessionUnitPrice(s, exp),
     seatsLeft: seatsLeft(s),
     availability: availability(s, now),
     waitlisted: waitlistedIds.has(s.id),
@@ -355,7 +356,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </Link>
               </div>
             ) : regina ? (
-              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} bookLabel={REGINA_BOOK_LABEL} seatNoun="seat" />
+              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} seatNoun="seat" bookSuffix=" — Free" />
             ) : (
               <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} />
             )}

@@ -23,7 +23,7 @@ test("Discover → book → confirmation → calendar updated → open ticket; c
   const first = page.getByRole("list", { name: "Results" }).getByRole("article").first();
   const title = (await first.getByRole("heading", { level: 3 }).innerText()).trim();
   await first.getByRole("link", { name: title }).click();
-  await page.getByRole("link", { name: "Book now" }).first().click();
+  await page.getByRole("link", { name: /^Reserve \d+ seats?$/ }).first().click();
   await page.getByRole("button", { name: "Add a ticket", exact: true }).click();
   await page.getByRole("checkbox", { name: /simulated payment/ }).check();
   await page.getByRole("checkbox", { name: /cancellation policy/ }).check();

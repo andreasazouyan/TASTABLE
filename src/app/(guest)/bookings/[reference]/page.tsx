@@ -99,7 +99,9 @@ async function Ticket({ params, searchParams }: PageProps<"/bookings/[reference]
         <div role="status" className="mb-8 flex items-start gap-3 rounded-2xl bg-[#e5eddc] p-5 text-[#2f3d24]">
           <CircleCheck className="mt-0.5 size-5 shrink-0" aria-hidden />
           <div>
-            <p className="font-medium">You&apos;re going! Booking {b.reference} is confirmed.</p>
+            <p className="font-medium">
+              You&apos;re going! Booking {b.reference} for {b.ticketCount} {b.ticketCount === 1 ? "seat" : "seats"} is confirmed.
+            </p>
             <p className="text-sm">
               Simulated payment {b.paymentReference} for {formatMoney(b.totalPriceCents)} recorded. No real money moved. Your tickets are below.
             </p>
