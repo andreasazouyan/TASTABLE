@@ -57,7 +57,7 @@ test("host ratings match verified reviews on cards and event pages; hosts withou
 test("Recommended for You explains itself and discovery stays complete", async ({ page }) => {
   await signInAs(page, /Jordan .*demo guest/);
   await page.goto("/");
-  const section = page.locator("section", { has: page.getByRole("heading", { name: "Picked for you, Jordan" }) });
+  const section = page.locator("section", { has: page.getByRole("heading", { name: "Recommended for you" }) });
   await expect(section.getByText(/^Why: /).first()).toBeVisible();
   await expect(section.getByText(/favorite dishes|Matches your love for|when you like to go out|In a category you chose/).first()).toBeVisible();
   for (const why of await section.getByText(/^Why: /).allTextContents()) expect(why).not.toMatch(/\d+ ?min/);

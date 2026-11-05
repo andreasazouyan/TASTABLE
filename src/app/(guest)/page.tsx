@@ -4,9 +4,8 @@ import { ArrowRight, Sparkles } from "lucide-react";
 
 import { Carousel, CarouselItem } from "@/components/experiences/carousel";
 import { ExperienceCard } from "@/components/experiences/experience-card";
+import { HomeSearch } from "@/components/site/home-search";
 import { Photo } from "@/components/site/photo";
-import { SearchBar } from "@/components/site/search-bar";
-import { SectionHeading } from "@/components/site/section-heading";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth/demo";
@@ -19,10 +18,16 @@ import { getSavedIds } from "@/server/queries/guest";
 import { getListings } from "@/server/queries/listings";
 import { getRecommendations } from "@/server/queries/recommendations";
 
+/**
+ * Guest Home: a compact marketplace. Search first, then the four categories, then four
+ * carousels. Discover is where full search, filters and date-first browsing live.
+ */
 export default function HomePage() {
   return (
     <>
-      <Hero />
+      <div className="container-page pt-5 sm:pt-7">
+        <HomeSearch className="mx-auto max-w-3xl" />
+      </div>
       <Suspense fallback={<HomeSkeleton />}>
         <HomeSections />
       </Suspense>
@@ -31,37 +36,7 @@ export default function HomePage() {
   );
 }
 
-function Hero() {
-  return (
-    <section aria-labelledby="hero-title" className="container-page pt-4 sm:pt-6">
-      <div className="relative isolate overflow-hidden rounded-[1.75rem] bg-foreground">
-        <Photo
-          src={PHOTOS.heroTable.src}
-          alt=""
-          theme="charcoal"
-          priority
-          sizes="100vw"
-          className="absolute inset-0 -z-10"
-          imageClassName="opacity-80"
-        />
-        <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
-        <div className="flex min-h-[30rem] flex-col justify-end px-5 pt-24 pb-6 sm:min-h-[34rem] sm:px-10 sm:pb-10 lg:min-h-[38rem] lg:px-14 lg:pb-14">
-          <p className="mb-4 text-xs font-semibold tracking-[0.18em] text-white/80 uppercase">New York · Supper clubs · Classes · Pop-ups</p>
-          <h1 id="hero-title" className="max-w-3xl text-[2.6rem] leading-[1.02] font-normal text-white sm:text-6xl lg:text-7xl">
-            Discover experiences worth sharing.
-          </h1>
-          <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
-            Hidden tables, hands-on classes and one-night pop-ups from New York&apos;s chefs and food creators, from $35 a seat. Bring
-            your friends or meet new ones. Clear cancellation terms, tickets on your phone.
-          </p>
-          <SearchBar className="mt-8 max-w-3xl" />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/** Everything below the hero reads one set of listings, the same data Discover and Calendar use. */
+/** Everything on Home reads one set of listings, the same data Discover, Calendar and Saved use. */
 async function HomeSections() {
   const now = await requestNow();
   const [listings, user] = await Promise.all([getListings(now.toISOString()), getCurrentUser()]);
@@ -77,36 +52,19 @@ async function HomeSections() {
   const popular = popularRow(upcoming);
   const area = areaRow(upcoming, prefs?.locationKey);
   const featured = featuredRow(upcoming);
-  const firstName = user?.name.split(" ")[0];
 
   return (
-    <div className="mt-16 space-y-16 sm:mt-24 sm:space-y-24">
+    <div className="mt-7 space-y-12 sm:mt-9 sm:space-y-14">
       <Categories counts={counts} />
 
       <section className="container-page" aria-labelledby="recommended-title">
-        <SectionHeading
-          id="recommended-title"
-          eyebrow="Recommended for you"
-          title={recs && firstName ? `Picked for you, ${firstName}` : "Recommended for You"}
-          description={
-            recs
-              ? "Ranked by simple rules from your experience types, days and times, neighborhood, budget and who you go with. Each card says why it's here."
-              : "A taste of every category to start with. Tell us what you like and this row becomes yours."
-          }
-          href="/discover?sort=recommended"
-          linkLabel="See all"
-        />
+        <RowHeading id="recommended-title" title="Recommended for you" subtitle="Handpicked experiences based on your tastes." href="/discover?sort=recommended" />
         {recs ? (
           recs.length ? (
             <Carousel label="Recommended for you">
-              {recs.map((r, i) => (
+              {recs.map((r) => (
                 <CarouselItem key={r.listing.id}>
-                  <ExperienceCard
-                    listing={r.listing}
-                    saved={saved.has(r.listing.id)}
-                    reason={`Why: ${r.reasons.slice(0, 2).join(" · ")}`}
-                    priority={i < 2}
-                  />
+                  <ExperienceCard listing={r.listing} saved={saved.has(r.listing.id)} reason={`Why: ${r.reasons.slice(0, 2).join(" · ")}`} />
                 </CarouselItem>
               ))}
             </Carousel>
@@ -123,30 +81,21 @@ async function HomeSections() {
           <>
             <PersonaliseNudge signedIn={!!user} />
             <Carousel label="Recommended for you">
-              {starterRow(upcoming).map((l, i) => (
+              {starterRow(upcoming).map((l) => (
                 <CarouselItem key={l.id}>
-                  <ExperienceCard listing={l} saved={saved.has(l.id)} priority={i < 2} />
+                  <ExperienceCard listing={l} saved={saved.has(l.id)} />
                 </CarouselItem>
               ))}
             </Carousel>
           </>
         )}
-        {recs && (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Not quite right?{" "}
-            <Link href="/profile#preferences" className="text-foreground underline underline-offset-4">
-              Edit your preferences
-            </Link>
-            .
-          </p>
-        )}
       </section>
 
       <HomeRow
         id="popular"
-        eyebrow="Most saved"
         title="Popular in NYC"
-        description="Ranked by how many guests saved each experience, most saved first. Save counts on sample listings come from simulated demo guests."
+        subtitle="See what everyone's loving."
+        note="Ranked by saves. Counts on sample listings come from simulated demo guests."
         href="/discover?sort=popular"
         items={popular}
         saved={saved}
@@ -155,13 +104,8 @@ async function HomeSections() {
 
       <HomeRow
         id="area"
-        eyebrow={area.borough ? "Near you" : "Around the five boroughs"}
         title={area.title}
-        description={
-          area.borough
-            ? "A spread of neighborhoods in your borough, from the area you chose when you set up Tastable."
-            : "A few experiences from across the city. Add your neighborhood in your preferences to see your borough here."
-        }
+        subtitle={area.borough ? "Discover something special near you." : "Discover something special across the five boroughs."}
         href={area.href}
         items={area.items}
         saved={saved}
@@ -169,9 +113,8 @@ async function HomeSections() {
 
       <HomeRow
         id="featured"
-        eyebrow="Hand-picked"
-        title="Featured Experiences"
-        description="A small selection our team is excited about this season."
+        title="Featured experiences"
+        subtitle="Special experiences selected by Tastable."
         href="/discover?collection=featured"
         items={featured}
         saved={saved}
@@ -181,20 +124,44 @@ async function HomeSections() {
   );
 }
 
+function RowHeading({ id, title, subtitle, note, href, as: Tag = "h2" }: { id: string; title: string; subtitle: string; note?: string; href: string; as?: "h1" | "h2" }) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
+      <div className="min-w-0">
+        <Tag id={id} className="text-[1.3rem] leading-tight sm:text-[1.6rem]">
+          {title}
+        </Tag>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {subtitle}
+          {note && <span className="block text-xs sm:inline sm:before:content-['_·_']">{note}</span>}
+        </p>
+      </div>
+      <Link
+        href={href}
+        aria-label={`See all: ${title}`}
+        className="group inline-flex shrink-0 items-center gap-1 text-sm font-medium text-foreground underline-offset-4 hover:underline"
+      >
+        See all
+        <ArrowRight className="size-4 transition-transform duration-300 ease-soft group-hover:translate-x-0.5" aria-hidden />
+      </Link>
+    </div>
+  );
+}
+
 function HomeRow({
   id,
-  eyebrow,
   title,
-  description,
+  subtitle,
+  note,
   href,
   items,
   saved,
   badge,
 }: {
   id: string;
-  eyebrow: string;
   title: string;
-  description: string;
+  subtitle: string;
+  note?: string;
   href: string;
   items: ListingMatch[];
   saved: Set<string>;
@@ -203,7 +170,7 @@ function HomeRow({
   if (!items.length) return null;
   return (
     <section className="container-page" aria-labelledby={`${id}-title`}>
-      <SectionHeading id={`${id}-title`} eyebrow={eyebrow} title={title} description={description} href={href} linkLabel="See all" />
+      <RowHeading id={`${id}-title`} title={title} subtitle={subtitle} note={note} href={href} />
       <Carousel label={title}>
         {items.map((l, i) => (
           <CarouselItem key={l.id}>
@@ -217,17 +184,12 @@ function HomeRow({
 
 function PersonaliseNudge({ signedIn }: { signedIn: boolean }) {
   return (
-    <div className="mb-6 flex flex-col items-start gap-4 rounded-2xl border bg-card p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-6">
-      <div className="flex gap-4">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-accent-foreground">
-          <Sparkles className="size-5" aria-hidden />
-        </span>
-        <p className="max-w-xl text-sm text-muted-foreground">
-          <span className="block font-medium text-foreground">Get recommendations that explain themselves</span>
-          Tell us where you are, when you like to go out, your budget and what you love to eat. Six quick steps, and you can skip any time.
-        </p>
-      </div>
-      <Button asChild variant="default">
+    <div className="mb-4 flex flex-col items-start gap-3 rounded-2xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="flex items-center gap-3 text-sm text-muted-foreground">
+        <Sparkles className="size-4 shrink-0 text-brand" aria-hidden />
+        Tell us your neighborhood, budget, when you go out and what you love to eat, and this row becomes yours.
+      </p>
+      <Button asChild variant="default" size="sm">
         <Link href={signedIn ? "/onboarding" : "/sign-in?next=/onboarding"}>
           Personalise Tastable <ArrowRight aria-hidden />
         </Link>
@@ -239,40 +201,40 @@ function PersonaliseNudge({ signedIn }: { signedIn: boolean }) {
 function Categories({ counts }: { counts: Record<string, number> }) {
   return (
     <section aria-labelledby="categories-title" className="container-page">
-      <SectionHeading
+      <RowHeading
         id="categories-title"
-        eyebrow="Browse by category"
+        as="h1"
         title="What are you in the mood for?"
+        subtitle="Four ways into New York's food scene."
         href="/discover"
-        linkLabel="See all"
       />
-      <ul className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+      <ul className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:scroll-px-6 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
         {CATEGORIES.map((c) => {
           const Icon = c.icon;
           const photo = PHOTOS[c.photo as PhotoKey];
           const n = counts[c.id] ?? 0;
           return (
-            <li key={c.id}>
+            <li key={c.id} className="w-[64%] shrink-0 snap-start sm:w-[36%] lg:w-auto">
               <Link
                 href={`/discover?category=${c.slug}`}
-                aria-label={`${c.name}: ${n} upcoming ${n === 1 ? "experience" : "experiences"}`}
-                className="group relative isolate flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-2xl p-4 text-white shadow-soft transition-shadow duration-300 hover:shadow-lift focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:aspect-[4/5] sm:p-5"
+                aria-label={`${c.name}: ${n} available ${n === 1 ? "experience" : "experiences"}`}
+                className="group relative isolate flex aspect-[16/10] flex-col justify-end overflow-hidden rounded-2xl p-3.5 text-white shadow-soft transition-shadow duration-300 hover:shadow-lift focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:aspect-[16/10] sm:p-4"
               >
                 <Photo
                   src={photo.src}
                   alt=""
                   theme="charcoal"
-                  sizes="(min-width: 1024px) 25vw, 50vw"
+                  sizes="(min-width: 1024px) 25vw, 45vw"
                   className="absolute inset-0 -z-10"
                   imageClassName="group-hover:scale-[1.04]"
                 />
-                <span aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
-                <span className="absolute top-3 right-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur sm:top-4 sm:right-4">
-                  {n} upcoming
+                <span aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-black/85 via-black/35 to-black/5" />
+                <span className="absolute top-2.5 right-2.5 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
+                  {n} available
                 </span>
-                <Icon className="mb-3 size-5 text-white/90" strokeWidth={1.5} aria-hidden />
-                <span className="font-display text-lg leading-tight sm:text-[1.35rem]">{c.name}</span>
-                <span className="mt-1.5 hidden text-sm text-white/80 sm:block">{c.description}</span>
+                <Icon className="mb-2 size-4.5 text-white/90" strokeWidth={1.5} aria-hidden />
+                <span className="font-display text-base leading-tight sm:text-lg">{c.shortName}</span>
+                <span className="mt-1 line-clamp-2 text-[13px] leading-snug text-white/80">{c.description}</span>
               </Link>
             </li>
           );
@@ -284,7 +246,7 @@ function Categories({ counts }: { counts: Record<string, number> }) {
 
 function HostBand() {
   return (
-    <section className="container-page mt-20 sm:mt-28" aria-labelledby="host-band-title">
+    <section className="container-page mt-16 sm:mt-20" aria-labelledby="host-band-title">
       <div className="grid overflow-hidden rounded-[1.75rem] bg-foreground text-background lg:grid-cols-2">
         <div className="p-8 sm:p-12">
           <p className="mb-3 text-xs font-semibold tracking-[0.18em] text-[#e7b9a3] uppercase">For hosts</p>
@@ -309,7 +271,7 @@ function HostBand() {
 
 function HomeSkeleton() {
   return (
-    <div className="container-page mt-16 sm:mt-24" aria-busy="true" aria-label="Loading your Home page">
+    <div className="container-page mt-7 sm:mt-9" aria-busy="true" aria-label="Loading your Home page">
       <Skeleton className="mb-6 h-8 w-64" />
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (

@@ -6,7 +6,7 @@ import { dateWindow, WHEN_KEYS } from "@/lib/discovery/dates";
 import { CATEGORIES } from "@/lib/domain/categories";
 import { locationMatcher } from "@/lib/discovery/location";
 import { BOROUGH_KEYS, distanceMiles, getNeighborhood, NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
-import { CUISINE_KEYS, FORMAT_IDS, HOST_TYPE_IDS, OCCASION_KEYS } from "@/lib/domain/taxonomy";
+import { CUISINE_KEYS, cuisineLabel, FORMAT_IDS, HOST_TYPE_IDS, OCCASION_KEYS } from "@/lib/domain/taxonomy";
 import { isoDateNY } from "@/lib/format";
 import type { Listing, ListingMatch, ListingSession } from "@/lib/discovery/types";
 
@@ -168,7 +168,10 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
     if (f.collection && !inCollection(l, f.collection)) continue;
     if (!inLocation(l.venue)) continue;
     if (q) {
-      const hay = [l.title, l.summary, l.cuisine, l.host.displayName, l.venue.neighborhood, ...l.tags].join(" ").toLowerCase();
+      const cat = CATEGORIES.find((c) => c.id === l.category);
+      const hay = [l.title, l.summary, l.cuisine, cuisineLabel(l.cuisine), cat?.name, cat?.shortName, l.host.displayName, l.venue.neighborhood, l.venue.borough, ...l.tags]
+        .join(" ")
+        .toLowerCase();
       if (!hay.includes(q)) continue;
     }
 

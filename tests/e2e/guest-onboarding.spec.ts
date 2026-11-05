@@ -85,7 +85,7 @@ test("onboarding: six pages, back keeps selections, refresh resumes, saved answe
 
   // Recommendations use the saved preferences.
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Picked for you, Alex" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Recommended for you" }).getByText(/^Why: /).first()).toBeVisible();
 });
 
 test("onboarding can be skipped, and onboarded guests aren't sent through it again", async ({ page }) => {
