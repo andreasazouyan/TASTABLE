@@ -2,94 +2,239 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 
-import { CardRow, CardRowItem } from "@/components/experiences/card-row";
+import { Carousel, CarouselItem } from "@/components/experiences/carousel";
 import { ExperienceCard } from "@/components/experiences/experience-card";
+import { HomeSearch } from "@/components/site/home-search";
 import { Photo } from "@/components/site/photo";
-import { SearchBar } from "@/components/site/search-bar";
-import { SectionHeading } from "@/components/site/section-heading";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth/demo";
 import { requestNow } from "@/lib/request-clock";
 import { CATEGORIES } from "@/lib/domain/categories";
 import { PHOTOS, type PhotoKey } from "@/lib/domain/photos";
-import { COLLECTIONS, applyFilters, filtersSchema, type CollectionKey } from "@/lib/discovery/filters";
+import { areaRow, categoryCounts, featuredRow, HOME_ROW_SIZE, popularRow, starterRow, upcomingForHome } from "@/lib/discovery/home-sections";
+import type { ListingMatch } from "@/lib/discovery/types";
 import { getSavedIds } from "@/server/queries/guest";
-import { getListings, getMarketplaceStats } from "@/server/queries/listings";
+import { getListings } from "@/server/queries/listings";
 import { getRecommendations } from "@/server/queries/recommendations";
 
+/**
+ * Guest Home: a compact marketplace. Search first, then the four categories, then four
+ * carousels. Discover is where full search, filters and date-first browsing live.
+ */
 export default function HomePage() {
   return (
     <>
-      <Hero />
-      <Categories />
-      <Suspense fallback={<RowSkeleton title="Recommended for You" />}>
-        <RecommendedForYou />
-      </Suspense>
-      <Suspense fallback={<RowSkeleton title="Curated collections" />}>
-        <Collections />
+      <div className="container-page pt-5 sm:pt-7">
+        <HomeSearch className="mx-auto max-w-3xl" />
+      </div>
+      <Suspense fallback={<HomeSkeleton />}>
+        <HomeSections />
       </Suspense>
       <HostBand />
     </>
   );
 }
 
-function Hero() {
+/** Everything on Home reads one set of listings, the same data Discover, Calendar and Saved use. */
+async function HomeSections() {
+  const now = await requestNow();
+  const [listings, user] = await Promise.all([getListings(now.toISOString()), getCurrentUser()]);
+  const prefs = user?.guestProfile?.preferences ?? null;
+  const onboarded = !!prefs?.onboardingCompletedAt;
+  const [saved, recs] = await Promise.all([
+    getSavedIds(user?.guestProfile?.id),
+    onboarded && prefs ? getRecommendations(prefs, now, HOME_ROW_SIZE) : Promise.resolve(null),
+  ]);
+
+  const upcoming = upcomingForHome(listings, now);
+  const counts = categoryCounts(upcoming);
+  const popular = popularRow(upcoming);
+  const area = areaRow(upcoming, prefs?.locationKey);
+  const featured = featuredRow(upcoming);
+
   return (
-    <section aria-labelledby="hero-title" className="container-page pt-4 sm:pt-6">
-      <div className="relative isolate overflow-hidden rounded-[1.75rem] bg-foreground">
-        <Photo
-          src={PHOTOS.heroTable.src}
-          alt=""
-          theme="charcoal"
-          priority
-          sizes="100vw"
-          className="absolute inset-0 -z-10"
-          imageClassName="opacity-80"
-        />
-        <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
-        <div className="flex min-h-[30rem] flex-col justify-end px-5 pt-24 pb-6 sm:min-h-[34rem] sm:px-10 sm:pb-10 lg:min-h-[38rem] lg:px-14 lg:pb-14">
-          <p className="mb-4 text-xs font-semibold tracking-[0.18em] text-white/80 uppercase">New York · Supper clubs · Classes · Pop-ups</p>
-          <h1 id="hero-title" className="max-w-3xl text-[2.6rem] leading-[1.02] font-normal text-white sm:text-6xl lg:text-7xl">
-            Discover experiences worth sharing.
-          </h1>
-          <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
-            Hidden tables, hands-on classes and one-night pop-ups from New York&apos;s chefs and food creators, from $35 a seat. Bring
-            your friends or meet new ones. Clear cancellation terms, tickets on your phone.
-          </p>
-          <SearchBar className="mt-8 max-w-3xl" />
-        </div>
+    <div className="mt-7 space-y-12 sm:mt-9 sm:space-y-14">
+      <Categories counts={counts} />
+
+      <section className="container-page" aria-labelledby="recommended-title">
+        <RowHeading id="recommended-title" title="Recommended for you" subtitle="Handpicked experiences based on your tastes." href="/discover?sort=recommended" />
+        {recs ? (
+          recs.length ? (
+            <Carousel label="Recommended for you">
+              {recs.map((r) => (
+                <CarouselItem key={r.listing.id}>
+                  <ExperienceCard listing={r.listing} saved={saved.has(r.listing.id)} reason={`Why: ${r.reasons.slice(0, 2).join(" · ")}`} />
+                </CarouselItem>
+              ))}
+            </Carousel>
+          ) : (
+            <p className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+              Nothing is bookable within your limits right now. Try adjusting your budget or travel answers in{" "}
+              <Link href="/profile#preferences" className="text-brand underline">
+                your preferences
+              </Link>
+              .
+            </p>
+          )
+        ) : (
+          <>
+            <PersonaliseNudge signedIn={!!user} />
+            <Carousel label="Recommended for you">
+              {starterRow(upcoming).map((l) => (
+                <CarouselItem key={l.id}>
+                  <ExperienceCard listing={l} saved={saved.has(l.id)} />
+                </CarouselItem>
+              ))}
+            </Carousel>
+          </>
+        )}
+      </section>
+
+      <HomeRow
+        id="popular"
+        title="Popular in NYC"
+        subtitle="See what everyone's loving."
+        note="Ranked by saves. Counts on sample listings come from simulated demo guests."
+        href="/discover?sort=popular"
+        items={popular}
+        saved={saved}
+        badge={(_, i) => `#${i + 1}`}
+      />
+
+      <HomeRow
+        id="area"
+        title={area.title}
+        subtitle={area.borough ? "Discover something special near you." : "Discover something special across the five boroughs."}
+        href={area.href}
+        items={area.items}
+        saved={saved}
+      />
+
+      <HomeRow
+        id="featured"
+        title="Featured experiences"
+        subtitle="Special experiences selected by Tastable."
+        href="/discover?collection=featured"
+        items={featured}
+        saved={saved}
+        badge={() => "Featured"}
+      />
+    </div>
+  );
+}
+
+function RowHeading({ id, title, subtitle, note, href, as: Tag = "h2" }: { id: string; title: string; subtitle: string; note?: string; href: string; as?: "h1" | "h2" }) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
+      <div className="min-w-0">
+        <Tag id={id} className="text-[1.3rem] leading-tight sm:text-[1.6rem]">
+          {title}
+        </Tag>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {subtitle}
+          {note && <span className="block text-xs sm:inline sm:before:content-['_·_']">{note}</span>}
+        </p>
       </div>
+      <Link
+        href={href}
+        aria-label={`See all: ${title}`}
+        className="group inline-flex shrink-0 items-center gap-1 text-sm font-medium text-foreground underline-offset-4 hover:underline"
+      >
+        See all
+        <ArrowRight className="size-4 transition-transform duration-300 ease-soft group-hover:translate-x-0.5" aria-hidden />
+      </Link>
+    </div>
+  );
+}
+
+function HomeRow({
+  id,
+  title,
+  subtitle,
+  note,
+  href,
+  items,
+  saved,
+  badge,
+}: {
+  id: string;
+  title: string;
+  subtitle: string;
+  note?: string;
+  href: string;
+  items: ListingMatch[];
+  saved: Set<string>;
+  badge?: (l: ListingMatch, i: number) => string | undefined;
+}) {
+  if (!items.length) return null;
+  return (
+    <section className="container-page" aria-labelledby={`${id}-title`}>
+      <RowHeading id={`${id}-title`} title={title} subtitle={subtitle} note={note} href={href} />
+      <Carousel label={title}>
+        {items.map((l, i) => (
+          <CarouselItem key={l.id}>
+            <ExperienceCard listing={l} saved={saved.has(l.id)} badge={badge?.(l, i)} />
+          </CarouselItem>
+        ))}
+      </Carousel>
     </section>
   );
 }
 
-function Categories() {
+function PersonaliseNudge({ signedIn }: { signedIn: boolean }) {
   return (
-    <section aria-labelledby="categories-title" className="container-page mt-16 sm:mt-24">
-      <SectionHeading id="categories-title" eyebrow="Four ways in" title="What are you in the mood for?" />
-      <ul className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+    <div className="mb-4 flex flex-col items-start gap-3 rounded-2xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="flex items-center gap-3 text-sm text-muted-foreground">
+        <Sparkles className="size-4 shrink-0 text-brand" aria-hidden />
+        Tell us your neighborhood, budget, when you go out and what you love to eat, and this row becomes yours.
+      </p>
+      <Button asChild variant="default" size="sm">
+        <Link href={signedIn ? "/onboarding" : "/sign-in?next=/onboarding"}>
+          Personalise Tastable <ArrowRight aria-hidden />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+function Categories({ counts }: { counts: Record<string, number> }) {
+  return (
+    <section aria-labelledby="categories-title" className="container-page">
+      <RowHeading
+        id="categories-title"
+        as="h1"
+        title="What are you in the mood for?"
+        subtitle="Four ways into New York's food scene."
+        href="/discover"
+      />
+      <ul className="-mx-4 flex snap-x scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:scroll-px-6 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible lg:px-0 [&::-webkit-scrollbar]:hidden">
         {CATEGORIES.map((c) => {
           const Icon = c.icon;
           const photo = PHOTOS[c.photo as PhotoKey];
+          const n = counts[c.id] ?? 0;
           return (
-            <li key={c.id}>
+            <li key={c.id} className="w-[64%] shrink-0 snap-start sm:w-[36%] lg:w-auto">
               <Link
                 href={`/discover?category=${c.slug}`}
-                className="group relative isolate flex aspect-[3/4] flex-col justify-end overflow-hidden rounded-2xl p-4 text-white shadow-soft transition-shadow duration-300 hover:shadow-lift focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:aspect-[4/5] sm:p-5"
+                aria-label={`${c.name}: ${n} available ${n === 1 ? "experience" : "experiences"}`}
+                className="group relative isolate flex aspect-[16/10] flex-col justify-end overflow-hidden rounded-2xl p-3.5 text-white shadow-soft transition-shadow duration-300 hover:shadow-lift focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none sm:aspect-[16/10] sm:p-4"
               >
                 <Photo
                   src={photo.src}
                   alt=""
                   theme="charcoal"
-                  sizes="(min-width: 1024px) 25vw, 50vw"
+                  sizes="(min-width: 1024px) 25vw, 45vw"
                   className="absolute inset-0 -z-10"
                   imageClassName="group-hover:scale-[1.04]"
                 />
-                <span aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
-                <Icon className="mb-3 size-5 text-white/90" strokeWidth={1.5} aria-hidden />
-                <span className="font-display text-lg leading-tight sm:text-[1.35rem]">{c.name}</span>
-                <span className="mt-1.5 hidden text-sm text-white/80 sm:block">{c.description}</span>
+                <span aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-t from-black/85 via-black/35 to-black/5" />
+                <span className="absolute top-2.5 right-2.5 rounded-full bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
+                  {n} available
+                </span>
+                <Icon className="mb-2 size-4.5 text-white/90" strokeWidth={1.5} aria-hidden />
+                <span className="font-display text-base leading-tight sm:text-lg">{c.shortName}</span>
+                <span className="mt-1 line-clamp-2 text-[13px] leading-snug text-white/80">{c.description}</span>
               </Link>
             </li>
           );
@@ -99,109 +244,9 @@ function Categories() {
   );
 }
 
-async function RecommendedForYou() {
-  const user = await getCurrentUser();
-  const prefs = user?.guestProfile?.preferences;
-  if (!user || !prefs?.onboardingCompletedAt) {
-    return (
-      <section className="container-page mt-16 sm:mt-24" aria-labelledby="personalise-title">
-        <div className="flex flex-col items-start gap-5 rounded-2xl border bg-card p-6 shadow-soft sm:flex-row sm:items-center sm:justify-between sm:p-8">
-          <div className="flex gap-4">
-            <span className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-soft text-accent-foreground">
-              <Sparkles className="size-5" aria-hidden />
-            </span>
-            <div>
-              <h2 id="personalise-title" className="text-xl">
-                Get recommendations that explain themselves
-              </h2>
-              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                Tell us where you are, when you like to go out and what you love to eat. Six quick steps, and you can skip any time.
-              </p>
-            </div>
-          </div>
-          <Button asChild variant="default">
-            <Link href={user ? "/onboarding" : "/sign-in?next=/onboarding"}>
-              Personalise Tastable <ArrowRight aria-hidden />
-            </Link>
-          </Button>
-        </div>
-      </section>
-    );
-  }
-
-  const now = await requestNow();
-  const [recs, saved] = await Promise.all([getRecommendations(prefs, now, 4), getSavedIds(user.guestProfile?.id)]);
-  return (
-    <section className="container-page mt-16 sm:mt-24" aria-labelledby="recommended-title">
-      <SectionHeading
-        id="recommended-title"
-        eyebrow="Recommended for you"
-        title={`Picked for you, ${user.name.split(" ")[0]}`}
-        description="Ranked by simple rules from your preferences. Each card says why it's here."
-        href="/profile#preferences"
-        linkLabel="Edit preferences"
-      />
-      {recs.length ? (
-        <CardRow label="Recommended for you">
-          {recs.map((r) => (
-            <CardRowItem key={r.listing.id}>
-              <ExperienceCard listing={r.listing} saved={saved.has(r.listing.id)} reason={`Why: ${r.reasons.slice(0, 2).join(" · ")}`} />
-            </CardRowItem>
-          ))}
-        </CardRow>
-      ) : (
-        <p className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-          Nothing is bookable within your limits right now. Try adjusting your budget or travel answers in{" "}
-          <Link href="/profile#preferences" className="text-brand underline">
-            your preferences
-          </Link>
-          .
-        </p>
-      )}
-    </section>
-  );
-}
-
-async function Collections() {
-  const now = await requestNow();
-  const [listings, user, stats] = await Promise.all([getListings(now.toISOString()), getCurrentUser(), getMarketplaceStats()]);
-  const saved = await getSavedIds(user?.guestProfile?.id);
-  // Prefer listings not already shown in an earlier collection, so rows feel distinct.
-  const shown = new Set<string>();
-  const collections = COLLECTIONS.map((c) => {
-    const matches = applyFilters(listings, filtersSchema.parse({ collection: c.key }), now);
-    const items = [...matches.filter((m) => !shown.has(m.id)), ...matches.filter((m) => shown.has(m.id))].slice(0, 4);
-    items.forEach((m) => shown.add(m.id));
-    return { ...c, items };
-  }).filter((c) => c.items.length > 0);
-
-  return (
-    <div className="mt-16 space-y-16 sm:mt-24 sm:space-y-24">
-      {collections.map((c, i) => (
-        <section key={c.key} className="container-page" aria-labelledby={`col-${c.key}`}>
-          <SectionHeading
-            id={`col-${c.key}`}
-            eyebrow={i === 0 ? `${stats.experiences} sample experiences · ${stats.neighborhoods} neighborhoods` : undefined}
-            title={c.title}
-            description={c.blurb}
-            href={`/discover?collection=${c.key satisfies CollectionKey}`}
-          />
-          <CardRow label={c.title}>
-            {c.items.map((l, j) => (
-              <CardRowItem key={l.id}>
-                <ExperienceCard listing={l} saved={saved.has(l.id)} priority={i === 0 && j < 2} />
-              </CardRowItem>
-            ))}
-          </CardRow>
-        </section>
-      ))}
-    </div>
-  );
-}
-
 function HostBand() {
   return (
-    <section className="container-page mt-20 sm:mt-28" aria-labelledby="host-band-title">
+    <section className="container-page mt-16 sm:mt-20" aria-labelledby="host-band-title">
       <div className="grid overflow-hidden rounded-[1.75rem] bg-foreground text-background lg:grid-cols-2">
         <div className="p-8 sm:p-12">
           <p className="mb-3 text-xs font-semibold tracking-[0.18em] text-[#e7b9a3] uppercase">For hosts</p>
@@ -224,9 +269,9 @@ function HostBand() {
   );
 }
 
-function RowSkeleton({ title }: { title: string }) {
+function HomeSkeleton() {
   return (
-    <div className="container-page mt-16 sm:mt-24" aria-busy="true" aria-label={`Loading ${title}`}>
+    <div className="container-page mt-7 sm:mt-9" aria-busy="true" aria-label="Loading your Home page">
       <Skeleton className="mb-6 h-8 w-64" />
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
