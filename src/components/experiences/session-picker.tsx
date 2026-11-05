@@ -37,6 +37,7 @@ export function SessionPicker({
   seatNoun = "spot",
   minSeats = 1,
   fixedSeats,
+  bookSuffix = "",
 }: {
   slug: string;
   sessions: PickerSession[];
@@ -48,6 +49,8 @@ export function SessionPicker({
   minSeats?: number;
   /** Event rule: every booking is exactly this many seats (shown as a fixed quantity). */
   fixedSeats?: number;
+  /** Appended to "Reserve N seats", e.g. " — Free". */
+  bookSuffix?: string;
 }) {
   const firstOpen = sessions.find((s) => s.availability === "AVAILABLE" || s.availability === "LIMITED");
   const [selected, setSelected] = useState(sessions.find((s) => s.id === initialId)?.id ?? firstOpen?.id ?? sessions[0]?.id);
@@ -169,7 +172,7 @@ export function SessionPicker({
               </div>
             </div>
             <Button asChild variant="brand" size="lg" className="w-full">
-              <Link href={`/experiences/${slug}/book?session=${current.id}&seats=${seats}`}>{bookLabel ?? `Reserve ${seatsLabel(seats)}`}</Link>
+              <Link href={`/experiences/${slug}/book?session=${current.id}&seats=${seats}`}>{bookLabel ?? `Reserve ${seatsLabel(seats)}${bookSuffix}`}</Link>
             </Button>
           </>
         ) : current?.availability === "SOLD_OUT" ? (
