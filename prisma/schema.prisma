@@ -638,6 +638,8 @@ model BookingTicket {
   attendeeName  String?
   attendeeEmail String?
   dietaryNotes  String?
+  /// Main course chosen for this guest, for events that ask (e.g. Regina's Table). Free text label.
+  mealChoice    String?
   status        TicketStatus @default(VALID)
   checkedInAt   DateTime?
   createdAt     DateTime     @default(now())
