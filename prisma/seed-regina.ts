@@ -8,7 +8,7 @@
  *   - Fresh seed: prisma/seed.ts calls seedReginasTable() at the end.
  *   - Existing database: `npm run demo:regina` (or the hosted build) adds it if it's missing.
  *
- * One session (Thursday, November 19, 2026, 8:30–11:00 PM New York time), 15 seats, 9 already
+ * One session (Monday, November 23, 2026, 8:30–11:00 PM New York time), 15 seats, 9 already
  * taken by seeded guests, so 6 seats are left.
  */
 import type { PrismaClient } from "../src/generated/prisma/client";
@@ -49,6 +49,16 @@ const MENU = [
 ];
 
 /** Kept here so existing databases can be updated in place (scripts/reginas-table.ts). */
+/** Andréas's copy (Nov 6): two paragraphs, shown with their line break. */
+export const REGINA_DESCRIPTION =
+  "Regina and the Tastable team are excited to invite you to International House for a fun evening of food, conversation, and connection!\n\n" +
+  "As part of our Entrepreneurship class, we're testing Tastable, our new platform for discovering unique culinary experiences. Join us for a homemade three-course dinner, meet new people, and help us bring our concept to life!";
+export const REGINA_HIGHLIGHTS = [
+  "Just 15 guests around one table",
+  "Homemade three-course dinner",
+  "Only 3 spots available — and you can bring a +1!",
+  "Free to attend — a special event to test the Tastable experience!",
+];
 export const REGINA_INCLUSIONS = ["Welcome drinks", "Homemade three-course dinner", "A main course of your choice for each guest"];
 
 const SCHEDULE = [
@@ -130,8 +140,7 @@ export async function seedReginasTable(db: PrismaClient, now: Date) {
       slug: REGINA_SLUG,
       title: REGINA_TITLE,
       summary: "A homemade three-course dinner for just 15 guests at International House New York.",
-      description:
-        "Join Regina for an intimate supper club at International House New York. Enjoy a homemade three-course dinner, meet new people, and spend an evening connecting over good food and conversation. With just 15 guests, this is a relaxed and welcoming experience designed to bring people together around the table.",
+      description: REGINA_DESCRIPTION,
       category: "SUPPER_CLUB_PRIVATE_DINING",
       cuisine: "italian",
       tags: "supper club,homemade,meet people,one night only",
@@ -139,7 +148,7 @@ export async function seedReginasTable(db: PrismaClient, now: Date) {
       socialAtmosphere: "MEET_NEW_PEOPLE",
       format: "SEATED_DINNER",
       occasions: "MEET_NEW_PEOPLE,BRING_A_FRIEND",
-      highlights: JSON.stringify(["Just 15 guests around one table", "Homemade three-course dinner", "Complimentary: a special Tastable demo event"]),
+      highlights: JSON.stringify(REGINA_HIGHLIGHTS),
       menu: JSON.stringify(legacyMenuFromSections(menuSections as MenuSectionInput[])),
       inclusions: JSON.stringify(REGINA_INCLUSIONS),
       status: "PUBLISHED",

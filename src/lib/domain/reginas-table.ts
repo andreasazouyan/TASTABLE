@@ -1,6 +1,6 @@
 /**
  * Regina's Entrepreneurship Class Supper: the special, complimentary Tastable demo event
- * (Thursday, November 19, 2026) with its own reservation flow: reserve 1 seat up to the seats
+ * (Monday, November 23, 2026) with its own reservation flow: reserve 1 seat up to the seats
  * left, each guest picks a main course, and the total is always $0.
  *
  * Single source of truth for the event's identity and rules, shared by the seed, the
@@ -11,7 +11,7 @@ export const REGINA_SESSION_ID = "ses_reginas-table-supper-club";
 export const REGINA_HOST_SLUG = "regina";
 
 /** One-time session: 8:30–11:00 PM New York time. */
-export const REGINA_DATE = "2026-11-19";
+export const REGINA_DATE = "2026-11-23";
 export const REGINA_START = { hour: 20, minute: 30 };
 export const REGINA_DURATION_MINUTES = 150;
 export const REGINA_CAPACITY = 15;

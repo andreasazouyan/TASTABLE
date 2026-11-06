@@ -179,7 +179,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </li>
               ))}
             </ul>
-            <p className="mt-6 text-[15px] leading-relaxed text-foreground/85">{exp.description}</p>
+            <p className="mt-6 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">{exp.description}</p>
           </Section>
 
           <Section title={menuHeading(exp.category)} id="menu">

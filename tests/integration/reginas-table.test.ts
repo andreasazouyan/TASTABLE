@@ -27,13 +27,15 @@ const seats = async () => {
 };
 
 describe("Regina's Entrepreneurship Class Supper demo event", () => {
-  it("is seeded once: one session on Nov 19 at 8:30 PM New York time, 15 seats, 6 left, $0", async () => {
+  it("is seeded once: one session on Mon Nov 23 at 8:30 PM New York time, 15 seats, 6 left, $0", async () => {
     const exp = await db.experience.findUniqueOrThrow({ where: { slug: REGINA_SLUG }, include: { sessions: true, venue: true, host: true, menuSections: { include: { items: true } }, itinerary: true } });
     expect(exp.title).toBe(REGINA_TITLE);
+    expect(exp.description).toMatch(/^Regina and the Tastable team are excited to invite you/);
+    expect(JSON.parse(exp.highlights)).toContain("Only 3 spots available — and you can bring a +1!");
     expect(await db.experience.count({ where: { title: exp.title } })).toBe(1);
     expect(exp.sessions).toHaveLength(1);
-    expect(exp.sessions[0].startsAt.toISOString()).toBe("2026-11-20T01:30:00.000Z");
-    expect(exp.sessions[0].endsAt.toISOString()).toBe("2026-11-20T04:00:00.000Z");
+    expect(exp.sessions[0].startsAt.toISOString()).toBe("2026-11-24T01:30:00.000Z");
+    expect(exp.sessions[0].endsAt.toISOString()).toBe("2026-11-24T04:00:00.000Z");
     expect(exp.ticketPriceCents).toBe(0);
     expect(exp.category).toBe("SUPPER_CLUB_PRIVATE_DINING");
     expect(exp.host.displayName).toBe("Regina");
@@ -48,7 +50,7 @@ describe("Regina's Entrepreneurship Class Supper demo event", () => {
     const ids = (await db.experience.findMany({ where: { status: "PUBLISHED" }, select: { id: true } })).map((x) => x.id);
     const listings = await getListingsByIds(ids, now);
     const found = (q: Record<string, string>) => applyFilters(listings, parseFilters(q), now).some((m) => m.slug === REGINA_SLUG);
-    expect(found({ date: "2026-11-19" })).toBe(true);
+    expect(found({ date: "2026-11-23" })).toBe(true);
     expect(found({ borough: "manhattan" })).toBe(true);
     expect(found({ neighborhood: "morningside-heights" })).toBe(true);
     expect(found({ category: "supper-clubs" })).toBe(true);
@@ -57,7 +59,7 @@ describe("Regina's Entrepreneurship Class Supper demo event", () => {
     const all = applyFilters(listings, parseFilters({}), now);
     const i = all.findIndex((m) => m.slug === REGINA_SLUG);
     expect(all.slice(0, i).every((m) => m.matched!.startsAt <= all[i].matched!.startsAt)).toBe(true);
-    expect(isoDateNY(all[i].matched!.startsAt)).toBe("2026-11-19");
+    expect(isoDateNY(all[i].matched!.startsAt)).toBe("2026-11-23");
   });
 
   it("reserves 1 to the seats left with a main per guest, blocks duplicates, never oversells, and resets to 6", async () => {

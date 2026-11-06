@@ -2,15 +2,15 @@ import { expect, signInAs, test } from "./helpers";
 
 const DETAIL = "/experiences/reginas-table-supper-club";
 
-test("Regina's Entrepreneurship Class Supper: on Nov 19 in Discover, reserve 1–N seats with mains, 6 → 3 seats, bookings, calendar and reset", async ({ page }) => {
+test("Regina's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1–N seats with mains, 6 → 3 seats, bookings, calendar and reset", async ({ page }) => {
   await signInAs(page, /Zoe .*demo guest/);
 
-  // Discover on Nov 19, with the Manhattan + Morningside Heights + Supper Club filters.
-  await page.goto("/discover?date=2026-11-19&borough=manhattan&neighborhood=morningside-heights&category=supper-clubs");
+  // Discover on Nov 23, with the Manhattan + Morningside Heights + Supper Club filters.
+  await page.goto("/discover?date=2026-11-23&borough=manhattan&neighborhood=morningside-heights&category=supper-clubs");
   const card = page.locator("article", { hasText: "Regina's Entrepreneurship Class Supper" });
   await expect(card).toHaveCount(1);
   await expect(card).toContainText("6 seats left");
-  await expect(card).toContainText("Thu, Nov 19, 8:30 PM");
+  await expect(card).toContainText("Mon, Nov 23, 8:30 PM");
   await expect(card).toContainText("$0");
 
   // Detail page: host, price, duration, venue, menu, schedule, seats.
@@ -22,6 +22,8 @@ test("Regina's Entrepreneurship Class Supper: on Nov 19 in Discover, reserve 1�
   await expect(page.getByTestId("price-note")).toHaveText("Complimentary experience — Special Tastable Demo Event");
   await expect(page.getByText("2 hr 30 min").first()).toBeVisible();
   await expect(page.getByText("500 Riverside Drive, Manhattan, NY 10027")).toBeVisible();
+  await expect(page.getByText(/Regina and the Tastable team are excited to invite you/)).toBeVisible();
+  await expect(page.getByText("Only 3 spots available — and you can bring a +1!")).toBeVisible();
   for (const t of ["Fresh green salad", "Pasta with meat sauce", "Vegetarian pesto pasta", "Chocolate cake", "Welcome drinks and mingling", "Three-course dinner", "Socializing and conversation"]) {
     await expect(page.getByText(t, { exact: true }).first()).toBeVisible();
   }
@@ -60,11 +62,11 @@ test("Regina's Entrepreneurship Class Supper: on Nov 19 in Discover, reserve 1�
   // Bookings and calendar.
   await page.goto("/bookings");
   await expect(page.getByText("Regina's Entrepreneurship Class Supper")).toHaveCount(1);
-  await page.goto("/calendar?date=2026-11-19");
+  await page.goto("/calendar?date=2026-11-23");
   await expect(page.getByText(/Regina/).first()).toBeVisible();
 
   // 6 → 3 seats, and the guest can't book twice.
-  await page.goto("/discover?date=2026-11-19");
+  await page.goto("/discover?date=2026-11-23");
   await expect(page.locator("article", { hasText: "Regina's Entrepreneurship" })).toContainText("3 seats left");
   await page.goto(DETAIL);
   await expect(page.getByText("You're on the guest list.")).toBeVisible();
@@ -72,6 +74,6 @@ test("Regina's Entrepreneurship Class Supper: on Nov 19 in Discover, reserve 1�
   // Developer reset: back to 6, demo reservation cleared.
   await page.getByRole("button", { name: "Reset demo event" }).click();
   await expect(page.getByText(/1 demo reservation cleared, 6 seats available/)).toBeVisible();
-  await page.goto("/discover?date=2026-11-19");
+  await page.goto("/discover?date=2026-11-23");
   await expect(page.locator("article", { hasText: "Regina's Entrepreneurship" })).toContainText("6 seats left");
 });
