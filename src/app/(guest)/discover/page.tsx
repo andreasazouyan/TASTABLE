@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { X } from "lucide-react";
 
+import { DateRangePicker } from "@/components/discover/date-range-picker";
 import { FiltersForm } from "@/components/discover/filters-form";
 import { MobileFilters } from "@/components/discover/mobile-filters";
 import { SortSelect } from "@/components/discover/sort-select";
@@ -20,7 +21,10 @@ import {
   filtersToQuery,
   parseFilters,
 } from "@/lib/discovery/filters";
+import { whenDays } from "@/lib/discovery/dates";
 import { groupByDate } from "@/lib/discovery/grouping";
+import { formatDate, isoDateNY } from "@/lib/format";
+import { nyDateTime } from "@/lib/clock";
 import { requestNow } from "@/lib/request-clock";
 import { chipsFor } from "@/lib/discovery/chips";
 import { getSavedIds } from "@/server/queries/guest";
@@ -57,6 +61,13 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
   const collection = COLLECTIONS.find((c) => c.key === filters.collection);
   const category = filters.category.length === 1 ? CATEGORIES.find((c) => c.slug === filters.category[0]) : undefined;
   const title = collection?.title ?? category?.name ?? "Discover";
+  // One chosen day (from the calendar, or Choose Dates with a single date): say which day.
+  const singleDay = !filters.when ? filters.date : filters.when === "custom" && !filters.to ? (filters.from ?? filters.date) : undefined;
+  const singleDayLabel = singleDay ? formatDate(nyDateTime(singleDay, 12), { weekday: "long", month: "long", day: "numeric" }) : null;
+  // What the date picker shows: a day (?date=), a range (?from=&to=), or an older quick-date link.
+  const quick = filters.when && filters.when !== "custom" ? whenDays(filters.when, now) : null;
+  const pickStart = quick?.first ?? filters.date ?? filters.from;
+  const pickEnd = quick ? quick.last : filters.date ? undefined : filters.to;
 
   return (
     <div className="container-page pt-8 sm:pt-12">
@@ -81,9 +92,13 @@ async function Discover({ searchParams }: { searchParams: PageProps<"/discover">
               <MobileFilters filters={filters} count={count} />
               <h2 id="results-heading" className="font-sans text-sm font-medium text-muted-foreground" aria-live="polite">
                 {results.length} {results.length === 1 ? "experience" : "experiences"}
+                {singleDayLabel && <> on {singleDayLabel}</>}
               </h2>
             </div>
-            <SortSelect value={sort} defaultValue={DEFAULT_DISCOVER_SORT} />
+            <div className="flex flex-wrap items-center gap-3">
+              <DateRangePicker start={pickStart} end={pickEnd} today={isoDateNY(now)} />
+              <SortSelect value={sort} defaultValue={DEFAULT_DISCOVER_SORT} />
+            </div>
           </div>
 
           {chips.length > 0 && (

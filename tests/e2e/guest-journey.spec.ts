@@ -24,7 +24,8 @@ test("guest: discover, filter, book two tickets, see ticket and calendar, cancel
   await expect(page.getByText(/No experiences match|Nothing matches/i)).toBeVisible();
 
   // Detail page → booking.
-  await page.goto("/discover?category=classes&spots=2&sort=soonest");
+  // A class a few days out (Nov 5 onwards), so cancelling later in this test is still free.
+  await page.goto("/discover?category=classes&spots=2&sort=soonest&from=2026-11-05");
   await page.locator("article a").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByText(/Cancellation policy/i).first()).toBeVisible();

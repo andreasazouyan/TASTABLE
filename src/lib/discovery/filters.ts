@@ -93,7 +93,6 @@ export function activeFilterCount(f: DiscoveryFilters) {
   let n = 0;
   for (const k of ["category", "cuisine", "host", "occasion", "format"] as const) n += f[k].length ? 1 : 0;
   for (const k of ["q", "near", "minPrice", "maxPrice", "spots", "collection"] as const) n += f[k] !== undefined ? 1 : 0;
-  if (f.when || f.date || f.from || f.to) n += 1;
   if (f.borough.length || f.neighborhood.length) n += 1;
   return n;
 }

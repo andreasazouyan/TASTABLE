@@ -34,10 +34,10 @@ test("Discover → book → confirmation → calendar updated → open ticket; c
 
   // The calendar shows it on the session's New York date, prominently, with the details.
   await page.goto(`/calendar?view=month&date=${day}`);
-  const cell = page.getByRole("gridcell").filter({ has: page.getByRole("link", { name: new RegExp(`^Select .*${Number(day.slice(8))}, ${day.slice(0, 4)}.*booked`) }) });
+  const cell = page.getByRole("gridcell").filter({ has: page.getByRole("link", { name: new RegExp(`^Discover .*${Number(day.slice(8))}, ${day.slice(0, 4)}: .*experiences?.*you're booked`) }) });
   await expect(cell.getByRole("link", { name: new RegExp(`Booked: .*${title}`) })).toBeVisible();
-  await cell.getByRole("link", { name: /^Select / }).click();
-  await page.waitForURL(new RegExp(`day=${day}`));
+  // The day panel (today, or ?day=) lists the plans with their details.
+  await page.goto(`/calendar?view=month&date=${day}&day=${day}`);
   const panel = page.getByRole("region", { name: /, (January|February|March|April|May|June|July|August|September|October|November|December) \d+/ });
   const plan = panel.getByRole("listitem").filter({ hasText: title });
   await expect(plan.getByText("Confirmed", { exact: true })).toBeVisible();
@@ -60,29 +60,48 @@ test("Discover → book → confirmation → calendar updated → open ticket; c
   await expect(after.getByText("Confirmed", { exact: true })).toHaveCount(0);
 });
 
-test("select an empty date → Discover opens filtered to that date; works across month and year", async ({ page }) => {
+test("every date opens Discover filtered to that day, with counts that match; works across month and year", async ({ page }) => {
   await signInAs(page, /Alex .*demo guest/, "/calendar");
-  // Week view across the year boundary, then pick New Year's Eve.
+  // Week view across the year boundary: New Year's Eve is a link into Discover for that date.
   await page.goto("/calendar?view=week&date=2026-12-30");
   await expect(page.getByRole("heading", { name: /Dec 27 – Jan 2, 2027/ })).toBeVisible();
-  await page.getByRole("link", { name: /^Select Thursday, December 31, 2026/ }).click();
-  await page.waitForURL(/day=2026-12-31/);
-  const panel = page.getByRole("region", { name: "Thursday, December 31" });
-  await expect(panel.getByText("No experiences planned yet.")).toBeVisible();
+  await page.getByRole("link", { name: /^Discover Thursday, December 31, 2026/ }).click();
+  await page.waitForURL(/\/discover\?date=2026-12-31/);
+  await expect(page.getByRole("list", { name: "Active filters" }).getByRole("link", { name: "Remove filter: Date: Thu, Dec 31" })).toBeVisible();
 
-  // Month navigation keeps working into the next year.
+  // Navigation keeps working into the next year.
+  await page.goto("/calendar?view=week&date=2026-12-30");
   await page.getByRole("link", { name: "Next week" }).click();
   await expect(page.getByRole("heading", { name: /Jan 3 – Jan 9, 2027/ })).toBeVisible();
 
-  // An empty upcoming day in view → Discover for that day, other filters still available.
+  // Every day of the next two weeks has experiences, and the count on the calendar is what Discover shows.
+  await page.goto("/calendar?view=month&date=2026-11-02");
+  for (let d = 2; d <= 15; d++) {
+    const link = page.getByRole("link", { name: new RegExp(`^Discover \\w+, November ${d}, 2026: (\\d+) experiences?`) });
+    await expect(link).toHaveCount(1);
+    const n = Number((await link.getAttribute("aria-label"))!.match(/: (\d+) experience/)![1]);
+    expect(n, `November ${d}`).toBeGreaterThanOrEqual(3);
+  }
+  const label = (await page.getByRole("link", { name: /^Discover Tuesday, November 10, 2026/ }).getAttribute("aria-label"))!;
+  const count = Number(label.match(/: (\d+) experience/)![1]);
+  await page.getByRole("link", { name: /^Discover Tuesday, November 10, 2026/ }).click();
+  await page.waitForURL(/\/discover\?date=2026-11-10/);
+  await expect(page.getByRole("heading", { name: `${count} ${count === 1 ? "experience" : "experiences"} on Tuesday, November 10` })).toBeVisible();
+  const cards = await page.getByRole("list", { name: "Results" }).getByRole("article").allInnerTexts();
+  expect(cards).toHaveLength(count);
+  for (const c of cards) expect(c).toMatch(/Tue, Nov 10/);
+
+  // Other filters combine with the date and keep it; removing the date chip keeps the others.
+  await expect(page.getByRole("button", { name: "Dates: Tue, Nov 10. Change dates" })).toBeVisible();
+  await page.getByRole("complementary", { name: "Filters" }).getByLabel("Cooking Classes & Workshops").check();
+  await page.waitForURL(/category=classes/);
+  await expect(page).toHaveURL(/date=2026-11-10/);
+  for (const c of await page.getByRole("list", { name: "Results" }).getByRole("article").allInnerTexts()) expect(c).toMatch(/Tue, Nov 10/);
+  await page.getByRole("list", { name: "Active filters" }).getByRole("link", { name: /Remove filter: Date: Tue, Nov 10/ }).click();
+  await page.waitForURL((u) => !u.search.includes("from=") && u.search.includes("category=classes"));
+
+  // The day panel still offers Discover for today.
   await page.goto("/calendar?view=month&date=2026-11-01&day=2026-11-05");
   await page.getByRole("region", { name: "Thursday, November 5" }).getByRole("link", { name: /experiences .*this day/ }).click();
   await page.waitForURL(/\/discover\?date=2026-11-05/);
-  await expect(page.getByRole("complementary", { name: "Filters" }).getByRole("radio", { name: "Choose Dates" })).toBeChecked();
-  const cards = await page.getByRole("list", { name: "Results" }).getByRole("article").allInnerTexts();
-  expect(cards.length).toBeGreaterThan(0);
-  for (const c of cards) expect(c).toMatch(/Thu, Nov 5/);
-  await page.getByRole("complementary", { name: "Filters" }).getByLabel("Cooking Classes & Workshops").check();
-  await page.waitForURL(/category=classes/);
-  await expect(page).toHaveURL(/from=2026-11-05/);
 });

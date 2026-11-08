@@ -30,6 +30,7 @@ import {
   type ExperienceSeed,
 } from "./seed-data";
 import { seedFoundation } from "./seed-foundation";
+import { seedUpcoming } from "./seed-upcoming";
 import { reminderTime } from "../src/lib/booking/cancellation";
 import { seedReginasTable } from "./seed-regina";
 
@@ -582,6 +583,9 @@ async function main() {
     });
   }
 
+  // One-time events filling the next 14 days (after persona bookings, so those are unchanged).
+  const upcoming = await seedUpcoming(db, NOW, policyIds);
+
   const foundation = await seedFoundation(db, NOW);
 
   // In-app reminders, 24 hours before, for confirmed bookings of upcoming sessions (shown in Tastable only).
@@ -599,6 +603,7 @@ async function main() {
   const counts = {
     ...foundation,
     reginasTable: regina,
+    ...upcoming,
     users: await db.user.count(),
     hosts: await db.hostProfile.count(),
     venues: await db.venue.count(),

@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useRef, useTransition } from "react";
 
 import { LocationFilter } from "@/components/discover/location-filter";
-import { WhenFilter } from "@/components/discover/when-filter";
 import { NeighborhoodOptions } from "@/components/site/neighborhood-options";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/lib/domain/categories";
@@ -122,6 +121,8 @@ export function FiltersForm({
       )}
       {filters.collection && <input type="hidden" name="collection" value={filters.collection} />}
       {filters.sort && <input type="hidden" name="sort" value={filters.sort} />}
+      {/* Dates are chosen with the date picker above the results; keep them when other filters change. */}
+      {(["when", "date", "from", "to"] as const).map((k) => filters[k] && <input key={k} type="hidden" name={k} value={filters[k]} />)}
 
       <Fieldset legend="Location">
         <LocationFilter key={[filters.borough, filters.neighborhood].join("|")} filters={filters} onChanged={() => push()} />
@@ -143,15 +144,6 @@ export function FiltersForm({
           <option value="10">Within 10 miles</option>
         </select>
         {!filters.near && <p className="mt-1.5 text-xs text-muted-foreground">Choose a starting point to filter by distance.</p>}
-      </Fieldset>
-
-      <Fieldset legend="When">
-        <WhenFilter
-          key={[filters.when, filters.date, filters.from, filters.to].join("|")}
-          filters={filters}
-          fieldClass={fieldClass}
-          onClear={() => push()}
-        />
       </Fieldset>
 
       <Fieldset legend="Category">

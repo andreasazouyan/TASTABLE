@@ -26,17 +26,20 @@ export function chipsFor(f: DiscoveryFilters, base: string): Chip[] {
   }
   if (f.near) chips.push({ label: `Near ${getNeighborhood(f.near)!.name}`, href: without({ near: undefined, within: undefined }) });
   if (f.near && f.within) chips.push({ label: `Within ${f.within} mi`, href: without({ within: undefined }) });
-  const dateLabel = (iso: string) => formatDate(nyDateTime(iso, 12), { month: "short", day: "numeric" });
+  const dateLabel = (iso: string) => formatDate(nyDateTime(iso, 12), { weekday: "short", month: "short", day: "numeric" });
   const noDates = { when: undefined, date: undefined, from: undefined, to: undefined };
   if (f.when && f.when !== "custom") chips.push({ label: WHEN_OPTIONS.find((o) => o.key === f.when)!.label, href: without(noDates) });
   else if (f.when === "custom") {
     const first = f.from ?? f.to ?? f.date;
     const last = f.from && f.to && f.to > f.from ? f.to : null;
-    if (first) chips.push({ label: last ? `${dateLabel(first)} – ${dateLabel(last)}` : dateLabel(first), href: without(noDates) });
+    if (first) chips.push({ label: last ? `${dateLabel(first)} – ${dateLabel(last)}` : `Date: ${dateLabel(first)}`, href: without(noDates) });
   } else {
-    if (f.date) chips.push({ label: dateLabel(f.date), href: without({ date: undefined }) });
-    if (f.from) chips.push({ label: `From ${dateLabel(f.from)}`, href: without({ from: undefined }) });
-    if (f.to) chips.push({ label: `Until ${dateLabel(f.to)}`, href: without({ to: undefined }) });
+    if (f.date) chips.push({ label: `Date: ${dateLabel(f.date)}`, href: without({ date: undefined }) });
+    else if (f.from && f.to && f.to >= f.from) chips.push({ label: `Dates: ${dateLabel(f.from)} – ${dateLabel(f.to)}`, href: without(noDates) });
+    else {
+      if (f.from) chips.push({ label: `From ${dateLabel(f.from)}`, href: without({ from: undefined }) });
+      if (f.to) chips.push({ label: `Until ${dateLabel(f.to)}`, href: without({ to: undefined }) });
+    }
   }
   for (const slug of f.category)
     chips.push({ label: CATEGORIES.find((c) => c.slug === slug)!.shortName, href: without({ category: f.category.filter((x) => x !== slug) }) });
