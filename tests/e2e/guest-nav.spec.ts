@@ -1,7 +1,7 @@
 import { expect, test, signInAs } from "./helpers";
 
 const TABS: [string, string, string][] = [
-  ["Home", "/", "Discover experiences worth sharing."],
+  ["Home", "/", "What are you in the mood for?"],
   ["Discover", "/discover", "Discover"],
   ["Calendar", "/calendar", "Calendar"],
   ["Saved", "/saved", "Saved"],
