@@ -57,10 +57,15 @@ async function Profile() {
     return (
       <div className="py-10 text-center">
         <h1 className="text-4xl">My Profile</h1>
-        <p className="mt-3 text-muted-foreground">Choose a demo identity to see bookings, saved experiences and preferences.</p>
-        <Button asChild className="mt-6">
-          <Link href="/sign-in?next=/profile">Choose a demo identity</Link>
-        </Button>
+        <p className="mt-3 text-muted-foreground">Log in or create an account to see bookings, saved experiences and preferences.</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <Button asChild>
+            <Link href="/sign-up">Create an account</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/sign-in?next=/profile">Log in</Link>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -101,7 +106,7 @@ async function Profile() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
-            <Link href="/sign-in">Switch identity</Link>
+            <Link href="/sign-in">Switch account</Link>
           </Button>
           <form action={signOut}>
             <Button type="submit" variant="ghost">

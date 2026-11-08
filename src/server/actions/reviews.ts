@@ -36,14 +36,14 @@ async function run(fn: () => Promise<{ id: string }>, message: string): Promise<
 /** Leave a verified review. The booking (owned by the signed-in guest) decides everything else. */
 export async function submitReviewAction(bookingId: string, input: unknown): Promise<ActionResult> {
   const user = await getCurrentUser();
-  if (!user?.guestProfile) return { ok: false, message: "Choose a demo identity first." };
+  if (!user?.guestProfile) return { ok: false, message: "Log in first." };
   const guestId = user.guestProfile.id;
   return run(() => createReview(db, { guestId, bookingId, input }, serverNow()), "Thanks! Your review is live.");
 }
 
 export async function editReviewAction(reviewId: string, input: unknown): Promise<ActionResult> {
   const user = await getCurrentUser();
-  if (!user?.guestProfile) return { ok: false, message: "Choose a demo identity first." };
+  if (!user?.guestProfile) return { ok: false, message: "Log in first." };
   const guestId = user.guestProfile.id;
   return run(() => updateReview(db, { guestId, reviewId, input }, serverNow()), "Your review was updated.");
 }
@@ -51,7 +51,7 @@ export async function editReviewAction(reviewId: string, input: unknown): Promis
 /** Report a review. It stays visible (and counted) until Tastable's moderators decide. */
 export async function reportReviewAction(reviewId: string, input: unknown): Promise<ActionResult> {
   const user = await getCurrentUser();
-  if (!user) return { ok: false, message: "Choose a demo identity to report a review." };
+  if (!user) return { ok: false, message: "Log in to report a review." };
   return run(
     async () => {
       await reportReview(db, { reporterUserId: user.id, reviewId, input }, serverNow());

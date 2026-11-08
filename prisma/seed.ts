@@ -72,17 +72,23 @@ function weekdayOf(iso: string) {
 const minutes = (n: number) => n * 60_000;
 const hoursMs = (n: number) => n * 3_600_000;
 
+/**
+ * Real accounts (isDemo = false) keep their login, guest/host profile and taste preferences across a
+ * demo reset. Everything tied to the sample catalog (bookings, saves, reviews, events) is rebuilt.
+ */
+const demoOnly = { user: { isDemo: true } };
+
 async function wipe() {
   // Children first. The database enforces foreign keys, so order matters.
   await db.reviewReport.deleteMany();
   await db.review.deleteMany();
-  await db.guestFavoriteDish.deleteMany();
+  await db.guestFavoriteDish.deleteMany({ where: { preferences: { guestProfile: demoOnly } } });
   await db.experienceDish.deleteMany();
   await db.experienceItineraryStep.deleteMany();
   await db.experienceMenuItem.deleteMany();
   await db.experienceMenuSection.deleteMany();
   await db.calendarShareItem.deleteMany();
-  await db.calendarSharingPreference.deleteMany();
+  await db.calendarSharingPreference.deleteMany({ where: { guestProfile: demoOnly } });
   await db.eventInvitation.deleteMany();
   await db.waitlistEntry.deleteMany();
   await db.bookingTicket.deleteMany();
@@ -96,10 +102,10 @@ async function wipe() {
   await db.cancellationPolicy.deleteMany();
   await db.venueAssistanceRequest.deleteMany();
   await db.venue.deleteMany();
-  await db.guestPreferences.deleteMany();
-  await db.guestProfile.deleteMany();
-  await db.hostProfile.deleteMany();
-  await db.user.deleteMany();
+  await db.guestPreferences.deleteMany({ where: { guestProfile: demoOnly } });
+  await db.guestProfile.deleteMany({ where: demoOnly });
+  await db.hostProfile.deleteMany({ where: demoOnly });
+  await db.user.deleteMany({ where: { isDemo: true } });
 }
 
 async function main() {

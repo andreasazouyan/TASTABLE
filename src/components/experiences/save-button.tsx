@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * Heart toggle with the number of unique guests who saved the experience next to it.
  * Optimistic: the heart and the count update immediately, then the server's stored count
  * (Experience.saveCount) replaces the optimistic one. Never shows a negative number.
- * Unauthenticated users are redirected to choose a demo identity.
+ * Unauthenticated users are redirected to sign in.
  */
 export function SaveButton({
   experienceId,

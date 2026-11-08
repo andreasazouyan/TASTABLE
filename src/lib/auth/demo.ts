@@ -1,21 +1,58 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { databaseUrl } from "@/lib/database-url";
 import { db } from "@/lib/db";
 
 /**
- * DEMO AUTHENTICATION ONLY.
- * People "sign in" by choosing a seeded demo identity. The cookie holds the user id plus an
- * HMAC so it cannot be edited to impersonate someone else. There are no passwords.
- * Replace with real authentication before any production use.
+ * Sessions for both kinds of sign-in:
+ * - real accounts (email + password, see src/server/actions/auth.ts and src/lib/auth/password.ts), and
+ * - the seeded demo personas, picked on /sign-in without a password.
+ * The cookie holds the user id plus an HMAC so it cannot be edited to impersonate someone else.
  */
 export const SESSION_COOKIE = "tastable_demo_session";
+export const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
+let cachedSecret: string | null = null;
+
+/**
+ * The HMAC key. AUTH_SECRET (or the older DEMO_AUTH_SECRET) when set. In production without
+ * either, it is derived from the database connection string, which is already a server-only
+ * secret, so a fresh Vercel deploy is never signed with a publicly known key.
+ */
 function secret() {
-  return process.env.DEMO_AUTH_SECRET || "tastable-local-demo-secret";
+  if (cachedSecret) return cachedSecret;
+  const configured = process.env.AUTH_SECRET || process.env.DEMO_AUTH_SECRET;
+  if (configured) return (cachedSecret = configured);
+  const dbUrl = databaseUrl();
+  if (process.env.NODE_ENV === "production" && dbUrl) {
+    return (cachedSecret = createHash("sha256").update(`tastable-session:${dbUrl}`).digest("base64url"));
+  }
+  return (cachedSecret = "tastable-local-demo-secret");
+}
+
+/** Set at sign-up when someone joins as a host: taste onboarding first, then host profile setup. */
+export const HOST_SIGNUP_COOKIE = "tastable_signup_host";
+
+/** After guest onboarding: hosts who just signed up continue to host setup (once). Null otherwise. */
+export async function takeHostSignupNext(hasHostProfile: boolean): Promise<string | null> {
+  const store = await cookies();
+  if (!store.get(HOST_SIGNUP_COOKIE)) return null;
+  store.delete(HOST_SIGNUP_COOKIE);
+  return hasHostProfile ? null : "/host/onboarding";
+}
+
+export async function startSession(userId: string) {
+  (await cookies()).set(SESSION_COOKIE, encodeSession(userId), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_MAX_AGE,
+  });
 }
 
 function sign(userId: string) {
@@ -37,7 +74,7 @@ export function decodeSession(value: string | undefined): string | null {
   return userId;
 }
 
-/** The signed-in demo user, or null. Reads cookies, so render callers inside <Suspense>. */
+/** The signed-in user (real account or demo persona), or null. Reads cookies, so render callers inside <Suspense>. */
 export async function getCurrentUser() {
   const store = await cookies();
   const userId = decodeSession(store.get(SESSION_COOKIE)?.value);
@@ -50,7 +87,7 @@ export async function getCurrentUser() {
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 
-/** Requires a signed-in user with a guest profile; otherwise sends them to pick a demo identity. */
+/** Requires a signed-in user with a guest profile; otherwise sends them to sign in. */
 export async function requireGuest(next = "/") {
   const user = await getCurrentUser();
   if (!user) redirect(`/sign-in?next=${encodeURIComponent(next)}`);
