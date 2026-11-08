@@ -180,7 +180,7 @@ describe("Tastable event images", () => {
   it("every mapped image file exists, covers are unique, and detail images follow the cover", async () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
-    const { ALL_EVENT_IMAGE_FILES, EVENT_IMAGES, eventImagesFor } = await import("@/lib/domain/event-images");
+    const { ALL_EVENT_IMAGE_FILES, EVENT_IMAGES, mappedEventImages: eventImagesFor } = await import("@/lib/domain/event-images");
     for (const f of ALL_EVENT_IMAGE_FILES) expect(fs.existsSync(path.join(process.cwd(), "public/tastable-event-images", f)), f).toBe(true);
     const covers = Object.values(EVENT_IMAGES).map((i) => i.file);
     expect(new Set(covers).size).toBe(covers.length);

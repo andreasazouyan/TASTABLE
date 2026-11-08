@@ -95,3 +95,13 @@ test("onboarding can be skipped, and onboarded guests aren't sent through it aga
   await page.getByRole("button", { name: "Skip for now" }).click();
   await page.waitForURL(/\/discover/);
 });
+
+test("the new-to-NYC persona starts onboarding from scratch on every sign-in", async ({ page }) => {
+  await signInAs(page, /Alex .*demo guest/);
+  await expect(page).toHaveURL(/\/onboarding/);
+  await page.getByRole("button", { name: "Skip for now" }).click();
+  await page.waitForURL(/\/discover/);
+  await signInAs(page, /Alex .*demo guest/);
+  await expect(page).toHaveURL(/\/onboarding/);
+  await expect(page.getByText("Step 1 of 6")).toBeVisible();
+});

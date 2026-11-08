@@ -7,6 +7,9 @@ import { z } from "zod";
 import { SESSION_COOKIE, encodeSession } from "@/lib/auth/demo";
 import { db } from "@/lib/db";
 
+/** Demo persona who hasn't set preferences yet (see src/lib/domain/personas.ts). */
+const FRESH_PERSONA_ID = "usr_alex";
+
 const safePath = z
   .string()
   .startsWith("/")
@@ -29,6 +32,17 @@ export async function signInAs(formData: FormData) {
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
+
+  // The "just moved to New York" persona always starts from a blank slate, so every visitor of the
+  // shared demo can walk through onboarding (otherwise the first person to finish it would hide it).
+  if (user.id === FRESH_PERSONA_ID && user.role !== "HOST" && !parsed.data.next && user.guestProfile) {
+    const guestProfileId = user.guestProfile.id;
+    await db.$transaction([
+      db.guestPreferences.deleteMany({ where: { guestProfileId } }),
+      db.guestPreferences.create({ data: { guestProfileId } }),
+    ]);
+    redirect("/onboarding");
+  }
 
   if (parsed.data.next) redirect(parsed.data.next);
   if (user.role === "HOST") redirect("/host");

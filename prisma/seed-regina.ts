@@ -16,6 +16,14 @@ import { quote } from "../src/lib/booking/pricing";
 import { LATE_FEE_POLICY_KEY, reminderTime, termsFromPolicy, termsSnapshot } from "../src/lib/booking/cancellation";
 import { nyDateTime } from "../src/lib/clock";
 import { EVENT_IMAGE_CREDIT, eventImagesFor } from "../src/lib/domain/event-images";
+import { PHOTOS } from "../src/lib/domain/photos";
+
+/** Tastable's own images when enabled, otherwise placeholder dinner photography. */
+function reginaPhotos() {
+  const own = eventImagesFor(REGINA_SLUG).map((p) => ({ ...p, credit: EVENT_IMAGE_CREDIT }));
+  const fallback = (["toast", "tables", "feast"] as const).map((k) => ({ url: PHOTOS[k].src, alt: PHOTOS[k].alt, credit: "Unsplash (placeholder)" }));
+  return (own.length ? own : fallback).map((p, i) => ({ ...p, sortOrder: i }));
+}
 import { legacyMenuFromSections, type MenuSectionInput } from "../src/lib/domain/event-content";
 import {
   REGINA_ADDRESS,
@@ -164,7 +172,7 @@ export async function seedReginasTable(db: PrismaClient, now: Date) {
       featured: false,
       menuStatus: "FINAL",
       isFictional: false,
-      photos: { create: eventImagesFor(REGINA_SLUG).map((p, i) => ({ ...p, credit: EVENT_IMAGE_CREDIT, sortOrder: i })) },
+      photos: { create: reginaPhotos() },
       menuSections: {
         create: menuSections.map((s, i) => ({
           title: s.title,

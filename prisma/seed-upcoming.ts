@@ -6,7 +6,7 @@
  */
 import type { PrismaClient } from "../src/generated/prisma/client";
 import { nyDateTime } from "../src/lib/clock";
-import { EVENT_IMAGE_CREDIT, EVENT_IMAGE_DIR } from "../src/lib/domain/event-images";
+import { EVENT_IMAGE_CREDIT, EVENT_IMAGE_DIR, USE_TASTABLE_EVENT_IMAGES } from "../src/lib/domain/event-images";
 import { getNeighborhood } from "../src/lib/domain/neighborhoods";
 import { PHOTOS } from "../src/lib/domain/photos";
 import { isoDateNY } from "../src/lib/format";
@@ -122,7 +122,7 @@ export async function seedUpcoming(db: PrismaClient, now: Date, policyIds: Map<s
         isFictional: true,
         photos: {
           create: [
-            ...(e.cover ? [{ url: `${EVENT_IMAGE_DIR}/${e.cover}`, alt: `Illustrative photo for ${e.title}`, credit: EVENT_IMAGE_CREDIT }] : []),
+            ...(e.cover && USE_TASTABLE_EVENT_IMAGES ? [{ url: `${EVENT_IMAGE_DIR}/${e.cover}`, alt: `Illustrative photo for ${e.title}`, credit: EVENT_IMAGE_CREDIT }] : []),
             ...e.photos.map((key) => ({ url: PHOTOS[key].src, alt: PHOTOS[key].alt, credit: "Unsplash (placeholder)" })),
           ]
             .slice(0, 3)
