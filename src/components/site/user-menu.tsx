@@ -21,11 +21,11 @@ export async function UserMenu({ dropdown = false }: { dropdown?: boolean }) {
   const user = await getCurrentUser();
   if (!user) {
     return (
-      <div className="flex items-center gap-1.5">
-        <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+      <div className="flex items-center gap-1 sm:gap-1.5">
+        <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3.5">
           <Link href="/sign-in">Log in</Link>
         </Button>
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="outline" size="sm" className="px-3 sm:px-3.5">
           <Link href="/sign-up">Sign up</Link>
         </Button>
       </div>
