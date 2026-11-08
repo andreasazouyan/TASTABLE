@@ -26,7 +26,7 @@ const seats = async () => {
   return s.capacity - s.seatsReserved;
 };
 
-describe("Regina's Entrepreneurship Class Supper demo event", () => {
+describe("Tastable Team's Entrepreneurship Class Supper demo event", () => {
   it("is seeded once: one session on Mon Nov 23 at 8:30 PM New York time, 15 seats, 6 left, $0", async () => {
     const exp = await db.experience.findUniqueOrThrow({ where: { slug: REGINA_SLUG }, include: { sessions: true, venue: true, host: true, menuSections: { include: { items: true } }, itinerary: true } });
     expect(exp.title).toBe(REGINA_TITLE);
@@ -38,8 +38,8 @@ describe("Regina's Entrepreneurship Class Supper demo event", () => {
     expect(exp.sessions[0].endsAt.toISOString()).toBe("2026-11-24T04:00:00.000Z");
     expect(exp.ticketPriceCents).toBe(0);
     expect(exp.category).toBe("SUPPER_CLUB_PRIVATE_DINING");
-    expect(exp.host.displayName).toBe("Regina");
-    expect(exp.host.hostType).toBe("CREATOR_INFLUENCER");
+    expect(exp.host.displayName).toBe("Tastable Team");
+    expect(exp.host.hostType).toBe("SUPPER_CLUB_ORGANIZER");
     expect(exp.venue.addressLine).toBe("500 Riverside Drive, Manhattan, NY 10027");
     expect(exp.menuSections.map((s) => s.title)).toEqual(["Starter", "Main", "Dessert"]);
     expect(exp.itinerary.map((s) => s.startOffsetMinutes)).toEqual([0, 30, 120]);

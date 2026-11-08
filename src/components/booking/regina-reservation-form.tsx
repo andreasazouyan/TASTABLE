@@ -66,7 +66,7 @@ function MainChoice({ name, legend, value, onChange, error }: { name: string; le
 }
 
 /**
- * Regina's Entrepreneurship Class Supper reservation: the standard quantity selector (1 or 2: you and
+ * Tastable Team's Entrepreneurship Class Supper reservation: the standard quantity selector (1 or 2: you and
  * a +1, within the seats left), a main course for each guest, and a $0 total. No payment step: it is complimentary.
  */
 export function ReginaReservationForm(p: Props) {
@@ -139,7 +139,7 @@ export function ReginaReservationForm(p: Props) {
             ))}
           </div>
           <div className="mt-5">
-            <Label htmlFor="dietaryRequirements">Allergies or anything Regina should know (optional)</Label>
+            <Label htmlFor="dietaryRequirements">Allergies or anything the hosts should know (optional)</Label>
             <textarea
               id="dietaryRequirements"
               name="dietaryRequirements"

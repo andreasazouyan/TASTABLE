@@ -1,5 +1,5 @@
 /**
- * Regina's Entrepreneurship Class Supper: the one-time, complimentary supper club for the live MVP demo.
+ * Tastable Team's Entrepreneurship Class Supper: the one-time, complimentary supper club for the live MVP demo.
  *
  * Unlike the fictional catalog, this event is real-world (a real venue on a fixed date), so it is
  * not marked as a fictional sample. It is added by its own idempotent step, without the seed's
@@ -22,6 +22,7 @@ import {
   REGINA_CAPACITY,
   REGINA_DATE,
   REGINA_DURATION_MINUTES,
+  REGINA_HOST_NAME,
   REGINA_HOST_SLUG,
   REGINA_MAINS,
   REGINA_SEEDED_BOOKING_PREFIX,
@@ -59,6 +60,21 @@ export const REGINA_HIGHLIGHTS = [
   "Only 3 spots available — and you can bring a +1!",
   "Free to attend — a special event to test the Tastable experience!",
 ];
+/** The host shown on cards and the event page: the Tastable Team (Regina cooks). */
+export const REGINA_HOST_DATA = {
+  displayName: REGINA_HOST_NAME,
+  hostType: "SUPPER_CLUB_ORGANIZER" as const,
+  tagline: "Homemade dinners that bring people together",
+  background: "The team behind Tastable, hosting a supper club for our Entrepreneurship class",
+  bio: "The Tastable Team hosts a homemade three-course dinner, cooked by Regina, for a small table of guests, with plenty of time to meet new people.",
+  homeNeighborhood: "morningside-heights",
+  cuisineExpertise: "italian",
+  credentials: "",
+  instagramHandle: null,
+  followerCount: 0,
+  verified: false,
+  isFictional: false,
+};
 export const REGINA_INCLUSIONS = ["Welcome drinks", "Homemade three-course dinner", "A main course of your choice for each guest"];
 
 const SCHEDULE = [
@@ -86,34 +102,20 @@ export async function seedReginasTable(db: PrismaClient, now: Date) {
 
   await db.user.upsert({
     where: { id: `usr_${HOST_KEY}` },
-    update: {},
+    update: { name: REGINA_HOST_NAME },
     create: {
       id: `usr_${HOST_KEY}`,
-      name: "Regina",
+      name: REGINA_HOST_NAME,
       email: "regina.host@example.com",
       role: "HOST",
       isDemo: true,
-      guestProfile: { create: { id: `gst_${HOST_KEY}`, displayName: "Regina", homeNeighborhood: "morningside-heights" } },
+      guestProfile: { create: { id: `gst_${HOST_KEY}`, displayName: REGINA_HOST_NAME, homeNeighborhood: "morningside-heights" } },
     },
   });
-  const hostData = {
-    displayName: "Regina",
-    hostType: "CREATOR_INFLUENCER" as const,
-    tagline: "Homemade dinners that bring people together",
-    background: "Food creator and host of intimate supper clubs",
-    bio: "Regina cooks a homemade three-course dinner for a small table of guests, with plenty of time to meet new people.",
-    homeNeighborhood: "morningside-heights",
-    cuisineExpertise: "italian",
-    credentials: "",
-    instagramHandle: null,
-    followerCount: 0,
-    verified: false,
-    isFictional: false,
-  };
   await db.hostProfile.upsert({
     where: { id: `hst_${HOST_KEY}` },
-    update: hostData,
-    create: { id: `hst_${HOST_KEY}`, userId: `usr_${HOST_KEY}`, slug: HOST_KEY, ...hostData, onboardingCompletedAt: now },
+    update: REGINA_HOST_DATA,
+    create: { id: `hst_${HOST_KEY}`, userId: `usr_${HOST_KEY}`, slug: HOST_KEY, ...REGINA_HOST_DATA, onboardingCompletedAt: now },
   });
 
   const venueData = {

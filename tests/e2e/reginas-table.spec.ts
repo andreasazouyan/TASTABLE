@@ -2,23 +2,25 @@ import { expect, signInAs, test } from "./helpers";
 
 const DETAIL = "/experiences/reginas-table-supper-club";
 
-test("Regina's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1–2 seats with mains, 6 → 4 seats, bookings, calendar and reset", async ({ page }) => {
+test("Tastable Team's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1–2 seats with mains, 6 → 4 seats, bookings, calendar and reset", async ({ page }) => {
   await signInAs(page, /Zoe .*demo guest/);
 
   // Discover on Nov 23, with the Manhattan + Morningside Heights + Supper Club filters.
   await page.goto("/discover?date=2026-11-23&borough=manhattan&neighborhood=morningside-heights&category=supper-clubs");
-  const card = page.locator("article", { hasText: "Regina's Entrepreneurship Class Supper" });
+  const card = page.locator("article", { hasText: "Tastable Team's Entrepreneurship Class Supper" });
   await expect(card).toHaveCount(1);
   await expect(card).toContainText("6 seats left");
   await expect(card).toContainText("Mon, Nov 23, 8:30 PM");
   await expect(card).toContainText("$0");
+  await expect(card).toContainText("Hosted by Tastable Team");
 
   // Detail page: host, price, duration, venue, menu, schedule, seats.
   await page.goto(DETAIL);
   await page.getByRole("button", { name: "Reset demo event" }).click();
   await expect(page.getByText(/Demo event reset/)).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Regina's Entrepreneurship Class Supper" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tastable Team's Entrepreneurship Class Supper" })).toBeVisible();
+  await expect(page.getByTestId("hosted-by")).toHaveText("Hosted by the Tastable Team");
   await expect(page.getByTestId("price-note")).toHaveText("Complimentary experience — Special Tastable Demo Event");
   await expect(page.getByText("2 hr 30 min").first()).toBeVisible();
   await expect(page.getByText("500 Riverside Drive, Manhattan, NY 10027")).toBeVisible();
@@ -57,13 +59,13 @@ test("Regina's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1�
 
   // Bookings and calendar.
   await page.goto("/bookings");
-  await expect(page.getByText("Regina's Entrepreneurship Class Supper")).toHaveCount(1);
+  await expect(page.getByText("Tastable Team's Entrepreneurship Class Supper")).toHaveCount(1);
   await page.goto("/calendar?date=2026-11-23");
-  await expect(page.getByText(/Regina/).first()).toBeVisible();
+  await expect(page.getByText(/Entrepreneurship Class Supper/).first()).toBeVisible();
 
   // 6 → 4 seats, and the guest can't book twice.
   await page.goto("/discover?date=2026-11-23");
-  await expect(page.locator("article", { hasText: "Regina's Entrepreneurship" })).toContainText("4 seats left");
+  await expect(page.locator("article", { hasText: "Tastable Team's Entrepreneurship" })).toContainText("4 seats left");
   await page.goto(DETAIL);
   await expect(page.getByText("You're on the guest list.")).toBeVisible();
 
@@ -71,5 +73,5 @@ test("Regina's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1�
   await page.getByRole("button", { name: "Reset demo event" }).click();
   await expect(page.getByText(/1 demo reservation cleared, 6 seats available/)).toBeVisible();
   await page.goto("/discover?date=2026-11-23");
-  await expect(page.locator("article", { hasText: "Regina's Entrepreneurship" })).toContainText("6 seats left");
+  await expect(page.locator("article", { hasText: "Tastable Team's Entrepreneurship" })).toContainText("6 seats left");
 });
