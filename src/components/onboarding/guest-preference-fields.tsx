@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { useId, useMemo, useRef, useState } from "react";
+import { MapPin, Plus, Search, X } from "lucide-react";
 
 import { ChoiceCard } from "@/components/onboarding/choice-card";
 import { Input } from "@/components/ui/input";
@@ -49,23 +49,64 @@ function Chip({ checked, children, ...input }: { checked: boolean; children: Rea
 
 export function NeighborhoodField({ value, onChange }: FieldProps) {
   const [query, setQuery] = useState("");
+  const selected = NEIGHBORHOODS.find((n) => n.key === value.locationKey);
+  // Once a neighborhood is picked the list folds away to just that choice, so the next question is in view.
+  const [browsing, setBrowsing] = useState(!selected);
   const id = useId();
+  const changeRef = useRef<HTMLButtonElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const q = normalizeDishText(query);
   const matches = NEIGHBORHOODS.filter((n) => !q || normalizeDishText(`${n.name} ${n.borough}`).includes(q));
   const boroughs = Array.from(new Set(matches.map((n) => n.borough)));
-  const selected = NEIGHBORHOODS.find((n) => n.key === value.locationKey);
+
+  const choose = (key: string) => {
+    onChange({ ...value, locationKey: key });
+    setBrowsing(false);
+    setQuery("");
+    // The list was long, so bring the folded choice (and the travel question under it) back into view.
+    requestAnimationFrame(() => {
+      cardRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      changeRef.current?.focus({ preventScroll: true });
+    });
+  };
+
+  if (selected && !browsing)
+    return (
+      <div ref={cardRef} className="flex scroll-mt-32 items-center justify-between gap-4 rounded-2xl border border-foreground bg-card p-4 shadow-soft" aria-live="polite">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand/10 text-brand">
+            <MapPin className="size-5" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm text-muted-foreground">Your neighborhood</p>
+            <p className="font-medium">
+              {selected.name}
+              <span className="font-normal text-muted-foreground"> · {selected.borough}</span>
+            </p>
+          </div>
+        </div>
+        <button
+          ref={changeRef}
+          type="button"
+          onClick={() => {
+            setBrowsing(true);
+            requestAnimationFrame(() => searchRef.current?.focus());
+          }}
+          aria-label={`Change neighborhood (currently ${selected.name})`}
+          className="shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition-colors hover:border-foreground/30 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+        >
+          Change
+        </button>
+      </div>
+    );
+
   return (
-    <fieldset>
-      <legend className="sr-only">NYC neighborhood</legend>
+    <div role="group" aria-label="NYC neighborhood">
       <div className="relative mb-4">
         <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-        <Input id={id} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search neighborhoods" aria-label="Search neighborhoods" className="pl-9" />
+        <Input ref={searchRef} id={id} type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search neighborhoods" aria-label="Search neighborhoods" className="pl-9" />
       </div>
-      {selected && (
-        <p className="mb-3 text-sm" aria-live="polite">
-          Selected: <strong>{selected.name}</strong>
-        </p>
-      )}
       <div className="space-y-4">
         {boroughs.map((b) => (
           <div key={b} role="group" aria-label={b}>
@@ -73,17 +114,29 @@ export function NeighborhoodField({ value, onChange }: FieldProps) {
             <div className="flex flex-wrap gap-2">
               {matches
                 .filter((n) => n.borough === b)
-                .map((n) => (
-                  <Chip key={n.key} type="radio" name="neighborhood" value={n.key} checked={value.locationKey === n.key} onChange={() => onChange({ ...value, locationKey: n.key })}>
-                    {n.name}
-                  </Chip>
-                ))}
+                .map((n) => {
+                  const on = value.locationKey === n.key;
+                  return (
+                    <button
+                      key={n.key}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => choose(n.key)}
+                      className={cn(
+                        "inline-flex min-h-10 cursor-pointer items-center rounded-full border px-4 py-2 text-sm transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none",
+                        on ? "border-foreground bg-foreground text-background" : "bg-card hover:border-foreground/30",
+                      )}
+                    >
+                      {n.name}
+                    </button>
+                  );
+                })}
             </div>
           </div>
         ))}
         {!matches.length && <p className="text-sm text-muted-foreground">No neighborhood matches &ldquo;{query}&rdquo;.</p>}
       </div>
-    </fieldset>
+    </div>
   );
 }
 
@@ -371,7 +424,11 @@ export const PREFERENCE_PAGES: PrefsPage[] = [
     Component: (p) => (
       <div className="space-y-10">
         <NeighborhoodField {...p} />
-        <TravelTimeField {...p} />
+        {p.value.locationKey && (
+          <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 ease-out">
+            <TravelTimeField {...p} />
+          </div>
+        )}
       </div>
     ),
   },
