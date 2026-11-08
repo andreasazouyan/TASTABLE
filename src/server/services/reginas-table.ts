@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
+  REGINA_MAX_SEATS,
   REGINA_SEEDED_BOOKING_PREFIX,
   REGINA_SESSION_ID,
   reginaMainLabel,
@@ -11,12 +12,13 @@ import { DomainError } from "@/server/services/errors";
 type Db = PrismaClient;
 
 /**
- * Reserves 1 seat up to the seats left, with a main course for each guest. Free ($0), so no
+ * Reserves 1 or 2 seats (you and a +1, within the seats left), with a main course for each guest. Free ($0), so no
  * simulated charge is made. Seats are reserved atomically by createBooking, so capacity can never
  * be exceeded; a guest holds one reservation, so a double submission can never book twice.
  */
 export async function reserveReginasTable(db: Db, guestId: string, input: ReginaReservationInput, now: Date) {
   if (input.sessionId !== REGINA_SESSION_ID) throw new DomainError("This reservation is only for Regina's Entrepreneurship Class Supper.", "CONFLICT");
+  if (input.ticketCount < 1 || input.ticketCount > REGINA_MAX_SEATS) throw new DomainError(`Reserve 1 or ${REGINA_MAX_SEATS} seats (you and a +1).`);
   const mains = Array.from({ length: input.ticketCount }, (_, i) => reginaMainLabel(input.mains[i] ?? ""));
   if (mains.some((m) => !m)) throw new DomainError("Choose a main course for each guest.");
   return createBooking(

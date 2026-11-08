@@ -2,7 +2,7 @@ import { expect, signInAs, test } from "./helpers";
 
 const DETAIL = "/experiences/reginas-table-supper-club";
 
-test("Regina's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1–N seats with mains, 6 → 3 seats, bookings, calendar and reset", async ({ page }) => {
+test("Regina's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1–2 seats with mains, 6 → 4 seats, bookings, calendar and reset", async ({ page }) => {
   await signInAs(page, /Zoe .*demo guest/);
 
   // Discover on Nov 23, with the Manhattan + Morningside Heights + Supper Club filters.
@@ -31,33 +31,29 @@ test("Regina's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1�
 
   await expect(page.getByText("Reservations are for 2")).toHaveCount(0);
 
-  // Reserve 3 seats with a main each: the standard [−] N [+] selector, 1 up to the 6 seats left.
+  // Reserve 2 seats (you and a +1) with a main each: the standard [−] N [+] selector, 1 to 2.
   await page.getByRole("link", { name: /Reserve/ }).first().click();
   await expect(page.getByTestId("seat-count")).toHaveText("1");
   await expect(page.getByRole("button", { name: "Remove a seat" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Reserve 1 seat — Free" })).toBeVisible();
   const plus = page.getByRole("button", { name: "Add a seat" });
-  for (let i = 0; i < 5; i++) await plus.click();
-  await expect(page.getByTestId("seat-count")).toHaveText("6");
+  await plus.click();
+  await expect(page.getByTestId("seat-count")).toHaveText("2");
   await expect(plus).toBeDisabled();
-  await page.getByRole("button", { name: "Remove a seat" }).click();
-  await page.getByRole("button", { name: "Remove a seat" }).click();
-  await page.getByRole("button", { name: "Remove a seat" }).click();
-  await expect(page.getByRole("button", { name: "Reserve 3 seats — Free" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reserve 2 seats — Free" })).toBeVisible();
   await page.getByLabel("Guest 2 name (optional)").fill("Sam Lee");
   await page.locator("input[name=main0][value=PESTO]").check();
   await page.locator("input[name=main1][value=MEAT_SAUCE]").check();
-  await page.locator("input[name=main2][value=PESTO]").check();
-  await expect(page.getByTestId("summary-guests")).toHaveText("3 guests");
+  await expect(page.getByTestId("summary-guests")).toHaveText("2 guests");
   await expect(page.getByTestId("regina-summary")).toContainText("Vegetarian pesto pasta");
   await expect(page.getByTestId("checkout-total")).toHaveText("$0.00");
-  await page.getByRole("button", { name: "Reserve 3 seats — Free" }).dblclick();
+  await page.getByRole("button", { name: "Reserve 2 seats — Free" }).dblclick();
   await page.waitForURL(/\/bookings\/TBL-/);
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("You're on the guest list!");
-  await expect(dialog).toContainText("Zoe Park: Vegetarian pesto pasta · Sam Lee: Pasta with meat sauce · Guest 3: Vegetarian pesto pasta");
+  await expect(dialog).toContainText("Zoe Park: Vegetarian pesto pasta · Sam Lee: Pasta with meat sauce");
   await dialog.getByRole("button", { name: /View My Ticket/ }).click();
-  await expect(page.getByTestId("meal-choice")).toHaveText(["Vegetarian pesto pasta", "Pasta with meat sauce", "Vegetarian pesto pasta"]);
+  await expect(page.getByTestId("meal-choice")).toHaveText(["Vegetarian pesto pasta", "Pasta with meat sauce"]);
 
   // Bookings and calendar.
   await page.goto("/bookings");
@@ -65,9 +61,9 @@ test("Regina's Entrepreneurship Class Supper: on Nov 23 in Discover, reserve 1�
   await page.goto("/calendar?date=2026-11-23");
   await expect(page.getByText(/Regina/).first()).toBeVisible();
 
-  // 6 → 3 seats, and the guest can't book twice.
+  // 6 → 4 seats, and the guest can't book twice.
   await page.goto("/discover?date=2026-11-23");
-  await expect(page.locator("article", { hasText: "Regina's Entrepreneurship" })).toContainText("3 seats left");
+  await expect(page.locator("article", { hasText: "Regina's Entrepreneurship" })).toContainText("4 seats left");
   await page.goto(DETAIL);
   await expect(page.getByText("You're on the guest list.")).toBeVisible();
 

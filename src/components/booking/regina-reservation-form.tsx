@@ -7,8 +7,7 @@ import { Gift, Minus, Plus, ShieldCheck, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MAX_TICKETS_PER_BOOKING } from "@/lib/booking/pricing";
-import { REGINA_MAINS, REGINA_PRICE_NOTE, reginaBookLabel, reginaPartySize } from "@/lib/domain/reginas-table";
+import { REGINA_MAINS, REGINA_MAX_SEATS, REGINA_PRICE_NOTE, reginaBookLabel, reginaPartySize } from "@/lib/domain/reginas-table";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { reserveReginasTableAction, type ReginaReserveState } from "@/server/actions/reginas-table";
@@ -67,18 +66,18 @@ function MainChoice({ name, legend, value, onChange, error }: { name: string; le
 }
 
 /**
- * Regina's Entrepreneurship Class Supper reservation: the standard quantity selector (1 up to the
- * seats left), a main course for each guest, and a $0 total. No payment step: it is complimentary.
+ * Regina's Entrepreneurship Class Supper reservation: the standard quantity selector (1 or 2: you and
+ * a +1, within the seats left), a main course for each guest, and a $0 total. No payment step: it is complimentary.
  */
 export function ReginaReservationForm(p: Props) {
   const [state, action, pending] = useActionState<ReginaReserveState, FormData>(reserveReginasTableAction, null);
-  const max = Math.max(1, Math.min(MAX_TICKETS_PER_BOOKING, p.seatsLeft));
-  const [seats, setSeats] = useState(() => reginaPartySize(p.initialSeats ?? 1, p.seatsLeft, MAX_TICKETS_PER_BOOKING));
+  const max = Math.max(1, Math.min(REGINA_MAX_SEATS, p.seatsLeft));
+  const [seats, setSeats] = useState(() => reginaPartySize(p.initialSeats ?? 1, p.seatsLeft, REGINA_MAX_SEATS));
   // Controlled so choices survive a server-side validation error (React resets uncontrolled forms).
   // Names and mains are kept for every guest slot, so lowering then raising the count keeps them.
   const [name, setName] = useState(p.defaultName);
-  const [guestNames, setGuestNames] = useState<string[]>(() => Array(MAX_TICKETS_PER_BOOKING).fill(""));
-  const [mains, setMains] = useState<string[]>(() => Array(MAX_TICKETS_PER_BOOKING).fill(""));
+  const [guestNames, setGuestNames] = useState<string[]>(() => Array(REGINA_MAX_SEATS).fill(""));
+  const [mains, setMains] = useState<string[]>(() => Array(REGINA_MAX_SEATS).fill(""));
   const fe = state?.fieldErrors ?? {};
   const label = (k: string) => REGINA_MAINS.find((m) => m.key === k)?.label ?? "Not chosen yet";
   const enough = p.seatsLeft >= 1;
@@ -96,7 +95,7 @@ export function ReginaReservationForm(p: Props) {
             <div>
               <p className="font-medium">Seats</p>
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="size-4 text-brand" aria-hidden /> Free · {p.seatsLeft} {p.seatsLeft === 1 ? "seat" : "seats"} left
+                <Users className="size-4 text-brand" aria-hidden /> Free · up to {REGINA_MAX_SEATS} per reservation (you + 1) · {p.seatsLeft} {p.seatsLeft === 1 ? "seat" : "seats"} left
               </p>
             </div>
             <div className="flex items-center gap-2" role="group" aria-label="Seat quantity">

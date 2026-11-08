@@ -1,7 +1,7 @@
 /**
  * Regina's Entrepreneurship Class Supper: the special, complimentary Tastable demo event
- * (Monday, November 23, 2026) with its own reservation flow: reserve 1 seat up to the seats
- * left, each guest picks a main course, and the total is always $0.
+ * (Monday, November 23, 2026) with its own reservation flow: reserve 1 or 2 seats (you
+ * and a +1, within the seats left), each guest picks a main course, and the total is always $0.
  *
  * Single source of truth for the event's identity and rules, shared by the seed, the
  * reservation service, the pages and the developer-only reset.
@@ -21,6 +21,8 @@ export const REGINA_SEEDED_SEATS = 9;
 export const REGINA_SEEDED_BOOKING_PREFIX = "bkg_regina_";
 
 export const REGINA_TITLE = "Regina's Entrepreneurship Class Supper";
+/** "Only 3 spots available — and you can bring a +1!": at most 2 seats per reservation (Andréas, Nov 8). */
+export const REGINA_MAX_SEATS = 2;
 export const REGINA_PRICE_NOTE = "Complimentary experience — Special Tastable Demo Event";
 /** Label on the event page's booking card, before a quantity is chosen. */
 export const REGINA_BOOK_LABEL = "Reserve — Free";
