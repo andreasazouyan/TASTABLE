@@ -28,6 +28,9 @@ export function ExperienceCard({
   reason,
   priority = false,
   className,
+  basePath = "/experiences",
+  showSave = true,
+  linkHost = true,
 }: {
   listing: CardListing;
   saved?: boolean;
@@ -35,11 +38,17 @@ export function ExperienceCard({
   reason?: string;
   priority?: boolean;
   className?: string;
+  /** Where the card links to; the host Explore tab uses /host/explore so hosts stay in their account. */
+  basePath?: string;
+  /** Saving is a guest feature; hidden when hosts browse. */
+  showSave?: boolean;
+  /** Link the host name to the public host profile (guest pages only). */
+  linkHost?: boolean;
 }) {
   const category = getCategory(listing.category as ExperienceCategory);
   const session = listing.matched;
   const more = (listing.matchedCount ?? 0) - 1;
-  const href = session ? `/experiences/${listing.slug}?session=${session.id}` : `/experiences/${listing.slug}`;
+  const href = session ? `${basePath}/${listing.slug}?session=${session.id}` : `${basePath}/${listing.slug}`;
 
   return (
     <article className={cn("group relative flex flex-col", className)}>
@@ -56,7 +65,9 @@ export function ExperienceCard({
         <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
           <div className="flex flex-wrap gap-1.5">{listing.isFictional && <SampleBadge />}</div>
         </div>
-        <SaveButton experienceId={listing.id} saved={saved} saveCount={listing.saves ?? 0} title={listing.title} className="absolute top-3 right-3 z-10" />
+        {showSave && (
+          <SaveButton experienceId={listing.id} saved={saved} saveCount={listing.saves ?? 0} title={listing.title} className="absolute top-3 right-3 z-10" />
+        )}
         {session && (
           <AvailabilityPill seatsLeft={session.seatsLeft} availability={session.availability} noun={isReginasTable(listing.slug) ? "seat" : "spot"} className="absolute bottom-3 left-3" />
         )}
@@ -75,9 +86,13 @@ export function ExperienceCard({
         <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
           <span className="truncate">
             Hosted by{" "}
-            <Link href={`/hosts/${listing.host.slug}`} className="relative z-10 underline-offset-4 hover:text-foreground hover:underline">
-              {listing.host.displayName}
-            </Link>
+            {linkHost ? (
+              <Link href={`/hosts/${listing.host.slug}`} className="relative z-10 underline-offset-4 hover:text-foreground hover:underline">
+                {listing.host.displayName}
+              </Link>
+            ) : (
+              listing.host.displayName
+            )}
           </span>
           {listing.host.verified && <BadgeCheck className="size-3.5 shrink-0 text-brand" aria-label="Verified host" />}
         </p>
