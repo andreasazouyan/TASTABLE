@@ -18,6 +18,10 @@ describe("seat quantity on the booking card", () => {
     expect(partySizeRange(1, { fixed: 2 }).bookable).toBe(false);
     expect(clampPartySize(5, partySizeRange(6, { fixed: 2 }))).toBe(2);
   });
+  it("event caps (Regina's Table: you + 1) limit the maximum", () => {
+    expect(partySizeRange(6, { max: 2 }).max).toBe(2);
+    expect(partySizeRange(1, { max: 2 }).max).toBe(1);
+  });
   it("clamps requested quantities from URLs", () => {
     const r = partySizeRange(3);
     expect(clampPartySize("2", r)).toBe(2);

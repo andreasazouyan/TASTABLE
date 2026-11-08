@@ -37,6 +37,7 @@ export function SessionPicker({
   seatNoun = "spot",
   minSeats = 1,
   fixedSeats,
+  maxSeats,
   bookSuffix = "",
 }: {
   slug: string;
@@ -49,6 +50,8 @@ export function SessionPicker({
   minSeats?: number;
   /** Event rule: every booking is exactly this many seats (shown as a fixed quantity). */
   fixedSeats?: number;
+  /** Event rule: at most this many seats per booking. */
+  maxSeats?: number;
   /** Appended to "Reserve N seats", e.g. " — Free". */
   bookSuffix?: string;
 }) {
@@ -56,7 +59,7 @@ export function SessionPicker({
   const [selected, setSelected] = useState(sessions.find((s) => s.id === initialId)?.id ?? firstOpen?.id ?? sessions[0]?.id);
   const [state, action, pending] = useActionState(joinWaitlistAction, null);
   const current = sessions.find((s) => s.id === selected);
-  const range = partySizeRange(current?.seatsLeft ?? 0, { fixed: fixedSeats });
+  const range = partySizeRange(current?.seatsLeft ?? 0, { fixed: fixedSeats, max: maxSeats });
   const bookable =
     current && (current.availability === "AVAILABLE" || current.availability === "LIMITED") && current.seatsLeft >= minSeats && range.bookable;
   const [requested, setRequested] = useState(range.min);

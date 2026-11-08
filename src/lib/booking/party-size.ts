@@ -5,14 +5,14 @@ import { MAX_TICKETS_PER_BOOKING } from "@/lib/booking/pricing";
  * event's own booking rule. `fixed` events (e.g. Regina's Table, pairs only) allow exactly that
  * many seats, and can't be booked at all once fewer remain.
  */
-export type PartySizeRule = { fixed?: number };
+export type PartySizeRule = { fixed?: number; /** Event-specific cap below the platform limit (e.g. Regina's Table: 2). */ max?: number };
 
 export type PartySizeRange = { min: number; max: number; fixed: boolean; bookable: boolean };
 
 export function partySizeRange(seatsLeft: number, rule: PartySizeRule = {}): PartySizeRange {
   const left = Math.max(0, Math.floor(seatsLeft));
   if (rule.fixed) return { min: rule.fixed, max: rule.fixed, fixed: true, bookable: left >= rule.fixed };
-  const max = Math.min(MAX_TICKETS_PER_BOOKING, left);
+  const max = Math.min(MAX_TICKETS_PER_BOOKING, rule.max ?? MAX_TICKETS_PER_BOOKING, left);
   return { min: 1, max: Math.max(1, max), fixed: false, bookable: max >= 1 };
 }
 

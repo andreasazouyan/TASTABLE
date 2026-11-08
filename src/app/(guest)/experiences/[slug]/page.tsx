@@ -28,7 +28,7 @@ import { requestNow } from "@/lib/request-clock";
 import { db } from "@/lib/db";
 import { getExperienceDetail } from "@/server/queries/listings";
 import { ReginaResetPanel } from "@/components/booking/regina-reset-panel";
-import { demoToolsEnabled, isReginasTable, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
+import { demoToolsEnabled, isReginasTable, REGINA_MAX_SEATS, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
 import { findReginaReservation } from "@/server/services/reginas-table";
 
 export default function ExperiencePage(props: PageProps<"/experiences/[slug]">) {
@@ -356,7 +356,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </Link>
               </div>
             ) : regina ? (
-              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} seatNoun="seat" bookSuffix=" — Free" />
+              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} seatNoun="seat" maxSeats={REGINA_MAX_SEATS} bookSuffix=" — Free" />
             ) : (
               <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} />
             )}

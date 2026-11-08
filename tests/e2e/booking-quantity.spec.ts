@@ -47,7 +47,7 @@ test("booking card: seat stepper, live total, Reserve N seats, carried into chec
   expect(after).toBe(before - 2);
 });
 
-test("booking card: Regina's Table uses the standard selector, $0 total, quantity carried to its reservation form", async ({ page }) => {
+test("booking card: Regina's Table uses the standard selector capped at 2, $0 total, quantity carried to its reservation form", async ({ page }) => {
   await signInAs(page, /Jordan/);
   await page.goto("/experiences/reginas-table-supper-club");
   const card = page.getByTestId("seat-quantity");
@@ -57,6 +57,9 @@ test("booking card: Regina's Table uses the standard selector, $0 total, quantit
   await expect(page.getByTestId("card-total")).toHaveText("$0");
   await page.getByRole("button", { name: "Add a guest" }).click();
   await expect(page.getByTestId("card-total")).toHaveText("$0");
+  // Capped at 2 per reservation (you + 1), even with more seats left.
+  await expect(page.getByRole("button", { name: "Add a guest" })).toBeDisabled();
+  await expect(card).toContainText("Up to 2 seats per booking.");
   await page.getByRole("link", { name: "Reserve 2 seats — Free", exact: true }).click();
   await expect(page).toHaveURL(/seats=2/);
   await expect(page.getByTestId("seat-count")).toHaveText("2");
