@@ -4,8 +4,13 @@ Tastable is a curated marketplace for unique culinary experiences in New York Ci
 Tagline: **"Discover experiences worth sharing."**
 
 **This is an advanced prototype, not a production payments platform.** Every transaction is
-simulated, authentication is a demo persona switch, and all hosts, events, guests and figures
+simulated, and all sample hosts, events, guests and figures
 are fictional. Never add real charges, never collect card data, never imply sample content is real.
+
+**Accounts:** anyone can create a real account (email + password, scrypt-hashed, `src/lib/auth/password.ts`,
+`src/server/actions/auth.ts`); real users have `isDemo = false` and survive demo re-seeds (their bookings and events
+do not). Seeded personas remain one click away on `/sign-in`. New guests and new hosts both go through the six-page
+taste onboarding; hosts then continue to `/host/onboarding` (cookie `tastable_signup_host`).
 
 @AGENTS.md
 

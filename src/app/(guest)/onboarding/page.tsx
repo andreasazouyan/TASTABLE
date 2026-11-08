@@ -3,7 +3,9 @@ import { Suspense } from "react";
 
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { requireGuest } from "@/lib/auth/demo";
+import { cookies } from "next/headers";
+
+import { HOST_SIGNUP_COOKIE, requireGuest } from "@/lib/auth/demo";
 import { toPrefsValue } from "@/lib/domain/preferences-value";
 import { getGuestPreferences } from "@/server/queries/preferences";
 
@@ -24,5 +26,16 @@ async function Onboarding({ searchParams }: PageProps<"/onboarding">) {
   const { guest } = await requireGuest("/onboarding");
   const prefs = await getGuestPreferences(guest.id);
   const step = Number(typeof sp.step === "string" ? sp.step : "1") - 1;
-  return <OnboardingWizard initial={toPrefsValue(prefs)} initialStep={Number.isFinite(step) ? step : 0} />;
+  const hostSignup = !!(await cookies()).get(HOST_SIGNUP_COOKIE);
+  return (
+    <>
+      {hostSignup && (
+        <p className="mx-auto mb-6 max-w-3xl rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">
+          <strong className="text-foreground">Welcome, host.</strong> First, a few questions about your own taste, so Tastable can recommend events
+          to you too. Next, you&apos;ll set up your host profile.
+        </p>
+      )}
+      <OnboardingWizard initial={toPrefsValue(prefs)} initialStep={Number.isFinite(step) ? step : 0} />
+    </>
+  );
 }

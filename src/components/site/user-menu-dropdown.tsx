@@ -61,7 +61,7 @@ export function UserMenuDropdown({ name, initials }: { name: string; initials: s
           </Link>
           <Link role="menuitem" href="/sign-in" className={item} onClick={() => setOpen(false)}>
             <Users aria-hidden className="size-4 text-muted-foreground" />
-            Switch demo identity
+            Switch account
           </Link>
           <form action={signOut}>
             <button role="menuitem" type="submit" className={item}>

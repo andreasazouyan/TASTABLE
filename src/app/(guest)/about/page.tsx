@@ -26,7 +26,7 @@ export default function AboutPage() {
               <code>sim_</code> are demo transactions.
             </li>
             <li>
-              <strong>Authentication is a demo identity switch</strong> with no passwords. <Link href="/sign-in" className="text-brand underline">Choose an identity</Link>.
+              <strong>Anyone can create a real account</strong> with an email and password. <Link href="/sign-up" className="text-brand underline">Create one</Link>, or explore as a fictional demo persona from <Link href="/sign-in" className="text-brand underline">Log in</Link>.
             </li>
           </ul>
         </section>

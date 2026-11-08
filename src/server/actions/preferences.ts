@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getCurrentUser } from "@/lib/auth/demo";
+import { getCurrentUser, takeHostSignupNext } from "@/lib/auth/demo";
 import { serverNow } from "@/lib/clock";
 import { db } from "@/lib/db";
 import type { GuestPreferencesPatch } from "@/lib/validation/preferences";
@@ -16,6 +16,12 @@ async function guestId() {
   return user.guestProfile.id;
 }
 
+/** New host accounts go on to host profile setup once their taste onboarding is done or skipped. */
+async function hostSetupNext() {
+  const user = await getCurrentUser();
+  return takeHostSignupNext(!!user?.hostProfile);
+}
+
 export async function skipOnboarding() {
   const id = await guestId();
   await db.guestPreferences.upsert({
@@ -24,7 +30,7 @@ export async function skipOnboarding() {
     update: { onboardingSkippedAt: serverNow() },
   });
   revalidatePath("/");
-  redirect("/discover");
+  redirect((await hostSetupNext()) ?? "/discover");
 }
 
 // ─── Onboarding v2 (six pages) and profile editing: typed patches through the preferences service ──
@@ -53,7 +59,7 @@ export async function saveOnboardingAnswers(patch: GuestPreferencesPatch): Promi
 /** Saves the last page and marks onboarding complete, then shows recommendations. */
 export async function finishOnboarding(patch: GuestPreferencesPatch): Promise<SaveAnswersResult> {
   const result = await savePatch(patch, true);
-  if (result.ok) redirect("/?welcome=1");
+  if (result.ok) redirect((await hostSetupNext()) ?? "/?welcome=1");
   return result;
 }
 

@@ -23,7 +23,7 @@ export function ReportReview({ reviewId, signedIn }: { reviewId: string; signedI
       <button
         type="button"
         className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-        onClick={() => (signedIn ? setOpen(true) : setResult({ ok: false, message: "Choose a demo identity to report a review." }))}
+        onClick={() => (signedIn ? setOpen(true) : setResult({ ok: false, message: "Log in to report a review." }))}
       >
         <Flag className="size-3" aria-hidden /> Report
         {result && !result.ok && <span role="alert"> · {result.message}</span>}

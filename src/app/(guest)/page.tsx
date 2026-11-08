@@ -190,7 +190,7 @@ function PersonaliseNudge({ signedIn }: { signedIn: boolean }) {
         Tell us your neighborhood, budget, when you go out and what you love to eat, and this row becomes yours.
       </p>
       <Button asChild variant="default" size="sm">
-        <Link href={signedIn ? "/onboarding" : "/sign-in?next=/onboarding"}>
+        <Link href={signedIn ? "/onboarding" : "/sign-up"}>
           Personalise Tastable <ArrowRight aria-hidden />
         </Link>
       </Button>

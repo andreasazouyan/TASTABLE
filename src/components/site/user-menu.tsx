@@ -14,16 +14,21 @@ function initials(name: string) {
 }
 
 /**
- * Signed-in demo persona, or a sign-in prompt. Reads cookies: render inside <Suspense>.
+ * Signed-in user, or log-in / sign-up prompts. Reads cookies: render inside <Suspense>.
  * `dropdown` (guest header) opens the profile dropdown; without it (host shell) it links to the profile.
  */
 export async function UserMenu({ dropdown = false }: { dropdown?: boolean }) {
   const user = await getCurrentUser();
   if (!user) {
     return (
-      <Button asChild variant="outline" size="sm">
-        <Link href="/sign-in">Sign in</Link>
-      </Button>
+      <div className="flex items-center gap-1.5">
+        <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+          <Link href="/sign-in">Log in</Link>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/sign-up">Sign up</Link>
+        </Button>
+      </div>
     );
   }
   if (dropdown) return <UserMenuDropdown name={user.name} initials={initials(user.name)} />;

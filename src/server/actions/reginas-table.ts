@@ -25,7 +25,7 @@ function revalidateViews() {
 /** Reserve 1 or more seats, free. Validated on the server; seats are reserved atomically. */
 export async function reserveReginasTableAction(_prev: ReginaReserveState, formData: FormData): Promise<ReginaReserveState> {
   const user = await getCurrentUser();
-  if (!user?.guestProfile) return { error: "Choose a demo identity before reserving." };
+  if (!user?.guestProfile) return { error: "Log in or create an account before reserving." };
 
   const parsed = reginaReservationFromFormData(formData);
   if (!parsed.success) return { error: "Please check the highlighted fields.", fieldErrors: z.flattenError(parsed.error).fieldErrors };

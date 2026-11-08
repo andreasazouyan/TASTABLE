@@ -26,7 +26,7 @@ function revalidateBookingViews(slug?: string) {
 /** Demo checkout. Validates on the server, reserves seats atomically, simulates payment. */
 export async function checkoutAction(_prev: CheckoutState, formData: FormData): Promise<CheckoutState> {
   const user = await getCurrentUser();
-  if (!user?.guestProfile) return { error: "Choose a demo identity before booking." };
+  if (!user?.guestProfile) return { error: "Log in or create an account before booking." };
 
   const parsed = checkoutFromFormData(formData);
   if (!parsed.success) {
