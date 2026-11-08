@@ -4,7 +4,13 @@ import { Suspense } from "react";
 import { BadgeCheck, CalendarClock, Check, Clock, KeyRound, Leaf, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 
 import { FollowButton } from "@/components/experiences/follow-button";
+import { EventMenu, menuHeading, type MenuView } from "@/components/experiences/event-menu";
+import { ExperienceTimeline } from "@/components/experiences/experience-timeline";
+import { HostRating } from "@/components/experiences/host-rating";
+import { sectionsFromLegacyMenu } from "@/lib/domain/event-content";
 import { SaveButton } from "@/components/experiences/save-button";
+import { parseReviewSort, ReviewList, ReviewSortLinks, ReviewSummary } from "@/components/reviews/review-list";
+import { getAspectAverages, getExperienceRating, getHostRating, getPublicReviews } from "@/server/queries/reviews";
 import { SessionPicker, type PickerSession } from "@/components/experiences/session-picker";
 import { ShareButton } from "@/components/experiences/share-button";
 import { Photo } from "@/components/site/photo";
@@ -13,7 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/lib/auth/demo";
 import { availability, seatsLeft } from "@/lib/booking/capacity";
 import { sessionUnitPrice } from "@/lib/booking/pricing";
-import { describePolicy } from "@/lib/booking/refunds";
+import { describeTerms, STANDARD_LATE_FEE_TERMS } from "@/lib/booking/cancellation";
 import { getCategory } from "@/lib/domain/categories";
 import { menuItemSchema, parseJson, parseList, stringItem } from "@/lib/domain/lists";
 import { ATMOSPHERES, cuisineLabel, dietaryLabel, FORMATS, HOST_TYPES, occasionLabel } from "@/lib/domain/taxonomy";
@@ -21,6 +27,9 @@ import { formatCompact, formatDate, formatDuration, formatPrice, formatTime } fr
 import { requestNow } from "@/lib/request-clock";
 import { db } from "@/lib/db";
 import { getExperienceDetail } from "@/server/queries/listings";
+import { ReginaResetPanel } from "@/components/booking/regina-reset-panel";
+import { demoToolsEnabled, isReginasTable, REGINA_HOSTED_BY, REGINA_MAX_SEATS, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
+import { findReginaReservation } from "@/server/services/reginas-table";
 
 export default function ExperiencePage(props: PageProps<"/experiences/[slug]">) {
   return (
@@ -49,18 +58,33 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
   if (!exp) notFound();
 
   const guestId = user?.guestProfile?.id;
-  const [saved, waitlisted] = await Promise.all([
+  const [saved, waitlisted, hostRating] = await Promise.all([
     guestId ? db.savedExperience.findUnique({ where: { guestId_experienceId: { guestId, experienceId: exp.id } } }) : null,
     guestId
       ? db.waitlistEntry.findMany({ where: { guestId, status: { in: ["WAITING", "NOTIFIED"] }, session: { experienceId: exp.id } }, select: { sessionId: true } })
       : [],
+    getHostRating(exp.hostId),
+  ]);
+  const reviewSort = parseReviewSort(sp.reviews);
+  const [eventRating, eventAspects, eventReviews] = await Promise.all([
+    getExperienceRating(exp.id),
+    getAspectAverages({ experienceId: exp.id }),
+    getPublicReviews({ experienceId: exp.id }, reviewSort, 20, guestId),
   ]);
   const waitlistedIds = new Set(waitlisted.map((w) => w.sessionId));
+  // Regina's event: free (1 seat up to the seats left), with its own guest list.
+  const regina = isReginasTable(exp.slug);
+  const reginaReservation = regina && guestId ? await findReginaReservation(db, guestId) : null;
   const following = (user?.guestProfile?.preferences?.followedHosts ?? "").split(",").includes(exp.host.slug);
 
   const category = getCategory(exp.category);
   const highlights = parseJson(exp.highlights, stringItem);
-  const menu = parseJson(exp.menu, menuItemSchema);
+  const menuView: MenuView = {
+    status: exp.menuStatus,
+    sections: exp.menuSections.length
+      ? exp.menuSections.map((sec) => ({ title: sec.title, description: sec.description, items: sec.items.map((it) => ({ ...it, dietaryTags: parseList(it.dietaryTags) })) }))
+      : sectionsFromLegacyMenu(parseJson(exp.menu, menuItemSchema)),
+  };
   const inclusions = parseJson(exp.inclusions, stringItem);
   const dietary = parseList(exp.dietaryOptions);
   const occasions = parseList(exp.occasions);
@@ -71,6 +95,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
     dateLabel: formatDate(s.startsAt, { weekday: "long", month: "long", day: "numeric" }),
     timeLabel: `${formatTime(s.startsAt)} – ${formatTime(s.endsAt)}`,
     priceLabel: formatPrice(sessionUnitPrice(s, exp)),
+    unitPriceCents: sessionUnitPrice(s, exp),
     seatsLeft: seatsLeft(s),
     availability: availability(s, now),
     waitlisted: waitlistedIds.has(s.id),
@@ -78,6 +103,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
   const fromPrice = Math.min(exp.ticketPriceCents, ...upcoming.map((s) => sessionUnitPrice(s, exp)));
   const atmosphere = ATMOSPHERES[exp.socialAtmosphere];
   const sessionParam = typeof sp.session === "string" ? sp.session : undefined;
+  const timelineSession = upcoming.find((x) => x.id === sessionParam && x.status !== "CANCELLED") ?? upcoming.find((x) => x.status !== "CANCELLED");
   const path = `/experiences/${exp.slug}`;
   const photos = exp.photos.length ? exp.photos : [{ id: "none", url: "", alt: exp.title }];
 
@@ -106,6 +132,11 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
             {exp.isFictional && <SampleBadge variant="outline" />}
           </div>
           <h1 className="text-4xl leading-[1.05] sm:text-5xl">{exp.title}</h1>
+          {regina && (
+            <p className="mt-2 text-base font-medium text-accent-foreground" data-testid="hosted-by">
+              {REGINA_HOSTED_BY}
+            </p>
+          )}
           <p className="mt-3 text-lg text-muted-foreground">{exp.summary}</p>
           <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1.5">
@@ -118,7 +149,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <SaveButton experienceId={exp.id} saved={!!saved} title={exp.title} variant="inline" />
+          <SaveButton experienceId={exp.id} saved={!!saved} saveCount={exp.saveCount} title={exp.title} variant="inline" />
           <ShareButton url={path} title={exp.title} text={exp.summary} />
         </div>
       </header>
@@ -137,7 +168,11 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
           />
         ))}
       </div>
-      {photos.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Placeholder photography (Unsplash). Photos do not depict this fictional host or event.</p>}
+      {photos.length > 1 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {exp.isFictional ? "Illustrative photography. Photos do not depict this fictional host or event." : "Illustrative photography."}
+        </p>
+      )}
 
       <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_24rem]">
         <div>
@@ -150,22 +185,18 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </li>
               ))}
             </ul>
-            <p className="mt-6 text-[15px] leading-relaxed text-foreground/85">{exp.description}</p>
+            <p className="mt-6 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">{exp.description}</p>
           </Section>
 
-          <Section title={exp.format === "HANDS_ON_CLASS" || exp.format === "DEMONSTRATION" ? "What you'll do" : "Menu"} id="menu">
-            <ol className="space-y-4">
-              {menu.map((m, i) => (
-                <li key={m.title + i} className="flex gap-4">
-                  <span className="font-display text-lg text-brand tabular-nums">{String(i + 1).padStart(2, "0")}</span>
-                  <span>
-                    <span className="block font-medium">{m.title}</span>
-                    {m.description && <span className="text-sm text-muted-foreground">{m.description}</span>}
-                  </span>
-                </li>
-              ))}
-            </ol>
+          <Section title={menuHeading(exp.category)} id="menu">
+            <EventMenu menu={menuView} />
           </Section>
+
+          {exp.itinerary.length > 0 && (
+            <Section title="Your Experience" id="itinerary">
+              <ExperienceTimeline steps={exp.itinerary} startsAt={timelineSession?.startsAt ?? null} />
+            </Section>
+          )}
 
           <Section title="What's included" id="included">
             <ul className="grid gap-2 sm:grid-cols-2">
@@ -218,14 +249,19 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
             <div className="rounded-2xl border bg-card p-5">
               <p className="font-display text-lg">{exp.venue.isSecretLocation ? "Secret location" : exp.venue.name}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {exp.venue.neighborhood}, {exp.venue.borough} · {exp.venue.type.replaceAll("_", " ").toLowerCase()}
+                {exp.venue.neighborhood}, {exp.venue.borough}
+                {exp.venue.isFictional && ` · ${exp.venue.type.replaceAll("_", " ").toLowerCase()}`}
               </p>
               {exp.venue.isSecretLocation ? (
                 <p className="mt-3 flex items-start gap-2 text-sm">
                   <KeyRound className="mt-0.5 size-4 text-brand" aria-hidden /> The exact address is shared with ticket holders 24 hours before.
                 </p>
-              ) : (
+              ) : exp.venue.isFictional ? (
                 <p className="mt-3 text-sm">Address shown on your ticket after booking.</p>
+              ) : (
+                <p className="mt-3 flex items-start gap-2 text-sm">
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /> {exp.venue.addressLine}
+                </p>
               )}
               {exp.venue.accessibilityNotes && <p className="mt-2 text-sm text-muted-foreground">Access: {exp.venue.accessibilityNotes}</p>}
             </div>
@@ -233,18 +269,25 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
 
           <Section title="Your host" id="host">
             <div className="flex flex-col gap-5 sm:flex-row">
-              <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-full bg-brand-soft font-display text-2xl text-accent-foreground">
-                {exp.host.displayName[0]}
-              </span>
+              <Link href={`/hosts/${exp.host.slug}`} aria-hidden tabIndex={-1} className="shrink-0">
+                {exp.host.profilePhotoUrl ? (
+                  <Photo src={exp.host.profilePhotoUrl} alt="" theme="terracotta" sizes="64px" className="size-16 rounded-full" />
+                ) : (
+                  <span className="grid size-16 place-items-center rounded-full bg-brand-soft font-display text-2xl text-accent-foreground">{exp.host.displayName[0]}</span>
+                )}
+              </Link>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="flex items-center gap-1.5 font-display text-xl">
-                    {exp.host.displayName}
+                    <Link href={`/hosts/${exp.host.slug}`} className="underline-offset-4 hover:underline">
+                      {exp.host.displayName}
+                    </Link>
                     {exp.host.verified && <BadgeCheck className="size-5 text-brand" aria-label="Verified host (demo)" />}
                   </p>
                   <FollowButton hostSlug={exp.host.slug} hostName={exp.host.displayName} following={following} />
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <HostRating rating={hostRating} size="md" className="mt-1" />
+                <p className="mt-1 text-sm text-muted-foreground">
                   {HOST_TYPES[exp.host.hostType].label} · {exp.host.tagline}
                   {exp.host.followerCount > 0 && ` · ${formatCompact(exp.host.followerCount)} followers (fictional)`}
                 </p>
@@ -263,26 +306,67 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
             </div>
           </Section>
 
+          <Section title="Reviews" id="reviews">
+            <ReviewSummary rating={eventRating} aspects={eventAspects} />
+            {eventReviews.length > 1 && (
+              <div className="mt-5 flex justify-end">
+                <ReviewSortLinks current={reviewSort} hrefFor={(s) => `${path}?${new URLSearchParams({ ...(sessionParam ? { session: sessionParam } : {}), ...(s === "recent" ? {} : { reviews: s }) })}#reviews`} />
+              </div>
+            )}
+            {eventReviews.length > 0 && <ReviewList reviews={eventReviews} signedIn={!!user} />}
+            <p className="mt-3 text-sm">
+              <Link href={`/hosts/${exp.host.slug}#reviews`} className="font-medium underline-offset-4 hover:underline">
+                All reviews for {exp.host.displayName}
+              </Link>
+            </p>
+          </Section>
+
           <Section title="Cancellation policy" id="policy">
-            <p className="mb-3 font-medium">{exp.cancellationPolicy.name}</p>
+            {/* New bookings use Tastable's standard terms; earlier bookings keep the terms they accepted. */}
+            <p className="mb-3 font-medium">{STANDARD_LATE_FEE_TERMS.name}</p>
             <ul className="space-y-1.5 text-sm text-muted-foreground">
-              {describePolicy(exp.cancellationPolicy).map((l) => (
+              {describeTerms(STANDARD_LATE_FEE_TERMS).map((l) => (
                 <li key={l}>{l}</li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-muted-foreground">You&apos;ll see the exact refund amount before confirming any cancellation.</p>
+            <p className="mt-3 text-xs text-muted-foreground">You&apos;ll see the exact fee and refund before confirming any cancellation.</p>
           </Section>
         </div>
 
         <aside aria-label="Book this experience" className="lg:relative">
           <div className="rounded-2xl border bg-card p-5 shadow-lift lg:sticky lg:top-24 sm:p-6">
-            <p className="mb-5">
-              <span className="text-sm text-muted-foreground">From </span>
-              <span className="font-display text-3xl">{formatPrice(fromPrice)}</span>
-              <span className="text-sm text-muted-foreground"> / person</span>
-            </p>
-            <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} />
+            {regina ? (
+              <div className="mb-5">
+                <p>
+                  <span className="font-display text-3xl">{formatPrice(fromPrice)}</span>
+                  <span className="text-sm text-muted-foreground"> / guest</span>
+                </p>
+                <p className="mt-1 text-sm font-medium text-accent-foreground" data-testid="price-note">
+                  {REGINA_PRICE_NOTE}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">One-time only</p>
+              </div>
+            ) : (
+              <p className="mb-5">
+                <span className="text-sm text-muted-foreground">From </span>
+                <span className="font-display text-3xl">{formatPrice(fromPrice)}</span>
+                <span className="text-sm text-muted-foreground"> / person</span>
+              </p>
+            )}
+            {reginaReservation ? (
+              <div className="rounded-xl bg-[#e5eddc] p-4 text-sm text-[#2f3d24]" role="status">
+                <p className="font-medium">You&apos;re on the guest list.</p>
+                <Link href={`/bookings/${reginaReservation.reference}`} className="mt-1 inline-block font-medium underline underline-offset-4">
+                  See your reservation
+                </Link>
+              </div>
+            ) : regina ? (
+              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} seatNoun="seat" maxSeats={REGINA_MAX_SEATS} bookSuffix=" — Free" />
+            ) : (
+              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} />
+            )}
           </div>
+          {regina && demoToolsEnabled() && <ReginaResetPanel className="mt-4" />}
         </aside>
       </div>
     </article>

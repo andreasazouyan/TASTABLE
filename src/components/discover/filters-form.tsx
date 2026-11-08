@@ -3,14 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useRef, useTransition } from "react";
 
+import { LocationFilter } from "@/components/discover/location-filter";
+import { WhenFilter } from "@/components/discover/when-filter";
+import { NeighborhoodOptions } from "@/components/site/neighborhood-options";
 import { Button } from "@/components/ui/button";
 import { CATEGORIES } from "@/lib/domain/categories";
-import { NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
+import { boroughKeyOf, getNeighborhood } from "@/lib/domain/neighborhoods";
 import { CUISINES, FORMATS, HOST_TYPES, OCCASIONS } from "@/lib/domain/taxonomy";
 import type { DiscoveryFilters } from "@/lib/discovery/filters";
 import { cn } from "@/lib/utils";
 
-const MULTI = ["category", "cuisine", "host", "occasion", "format"] as const;
+const MULTI = ["category", "cuisine", "host", "occasion", "format", "borough", "neighborhood"] as const;
 
 /** Turns the form into the same query string a no-JS submit would produce (lists comma-joined). */
 function toQuery(form: HTMLFormElement) {
@@ -19,6 +22,20 @@ function toQuery(form: HTMLFormElement) {
   for (const key of new Set(fd.keys())) {
     const values = fd.getAll(key).map(String).filter(Boolean);
     if (values.length) sp.set(key, (MULTI as readonly string[]).includes(key) ? values.join(",") : values[0]);
+  }
+  // Neighborhoods only count while their borough is chosen (unticking a borough drops them).
+  const boroughs = fd.getAll("borough").map(String);
+  const hoods = fd.getAll("neighborhood").map(String).filter((k) => {
+    const n = getNeighborhood(k);
+    return n && boroughs.includes(boroughKeyOf(n));
+  });
+  if (hoods.length) sp.set("neighborhood", hoods.join(","));
+  else sp.delete("neighborhood");
+  // A quick date option (Today, Tomorrow…) replaces any chosen dates.
+  const when = sp.get("when");
+  if (when && when !== "custom") {
+    sp.delete("from");
+    sp.delete("to");
   }
   return sp.toString();
 }
@@ -77,19 +94,15 @@ export function FiltersForm({ filters, className, onApplied }: { filters: Discov
       {filters.q && <input type="hidden" name="q" value={filters.q} />}
       {filters.collection && <input type="hidden" name="collection" value={filters.collection} />}
       {filters.sort && <input type="hidden" name="sort" value={filters.sort} />}
-      {filters.date && <input type="hidden" name="date" value={filters.date} />}
 
       <Fieldset legend="Location">
-        <label className="mb-1.5 block text-muted-foreground" htmlFor="f-near">
-          Neighborhood
+        <LocationFilter key={[filters.borough, filters.neighborhood].join("|")} filters={filters} onChanged={() => push()} />
+        <label className="mt-4 mb-1.5 block text-muted-foreground" htmlFor="f-near">
+          Distance from
         </label>
         <select id="f-near" name="near" defaultValue={filters.near ?? ""} className={fieldClass}>
           <option value="">Anywhere in NYC</option>
-          {NEIGHBORHOODS.map((n) => (
-            <option key={n.key} value={n.key}>
-              {n.name} ({n.borough})
-            </option>
-          ))}
+          <NeighborhoodOptions />
         </select>
         <label className="mt-3 mb-1.5 block text-muted-foreground" htmlFor="f-within">
           Travel distance
@@ -101,20 +114,16 @@ export function FiltersForm({ filters, className, onApplied }: { filters: Discov
           <option value="5">Within 5 miles</option>
           <option value="10">Within 10 miles</option>
         </select>
-        {!filters.near && <p className="mt-1.5 text-xs text-muted-foreground">Choose a neighborhood to filter by distance.</p>}
+        {!filters.near && <p className="mt-1.5 text-xs text-muted-foreground">Choose a starting point to filter by distance.</p>}
       </Fieldset>
 
-      <Fieldset legend="Dates">
-        <div className="grid grid-cols-2 gap-2">
-          <label className="text-muted-foreground">
-            From
-            <input type="date" name="from" defaultValue={filters.from} className={cn(fieldClass, "mt-1.5")} />
-          </label>
-          <label className="text-muted-foreground">
-            To
-            <input type="date" name="to" defaultValue={filters.to} min={filters.from} className={cn(fieldClass, "mt-1.5")} />
-          </label>
-        </div>
+      <Fieldset legend="When">
+        <WhenFilter
+          key={[filters.when, filters.date, filters.from, filters.to].join("|")}
+          filters={filters}
+          fieldClass={fieldClass}
+          onClear={() => push()}
+        />
       </Fieldset>
 
       <Fieldset legend="Category">

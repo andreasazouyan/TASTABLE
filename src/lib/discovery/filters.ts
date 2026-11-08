@@ -1,9 +1,11 @@
 import { z } from "zod";
 
 import { isBookable } from "@/lib/booking/capacity";
-import { nyDateTime, nyDayRange } from "@/lib/clock";
+import { nyDateTime } from "@/lib/clock";
+import { dateWindow, WHEN_KEYS } from "@/lib/discovery/dates";
 import { CATEGORIES } from "@/lib/domain/categories";
-import { distanceMiles, getNeighborhood } from "@/lib/domain/neighborhoods";
+import { locationMatcher } from "@/lib/discovery/location";
+import { BOROUGH_KEYS, distanceMiles, getNeighborhood, NEIGHBORHOODS } from "@/lib/domain/neighborhoods";
 import { CUISINE_KEYS, FORMAT_IDS, HOST_TYPE_IDS, OCCASION_KEYS } from "@/lib/domain/taxonomy";
 import { isoDateNY } from "@/lib/format";
 import type { Listing, ListingMatch, ListingSession } from "@/lib/discovery/types";
@@ -23,13 +25,15 @@ const categorySlugs = CATEGORIES.map((c) => c.slug);
 
 export const SORTS = [
   { key: "recommended", label: "Recommended" },
-  { key: "soonest", label: "Soonest" },
+  { key: "soonest", label: "Date: Soonest First" },
   { key: "price-asc", label: "Price: low to high" },
   { key: "price-desc", label: "Price: high to low" },
   { key: "spots", label: "Most spots left" },
   { key: "newest", label: "Newest" },
 ] as const;
 export type SortKey = (typeof SORTS)[number]["key"];
+/** Discover opens chronologically when no sort is chosen. */
+export const DEFAULT_DISCOVER_SORT: SortKey = "soonest";
 
 export const COLLECTIONS = [
   { key: "this-weekend", title: "This Weekend", blurb: "Friday to Sunday, with seats still open." },
@@ -50,8 +54,11 @@ export const filtersSchema = z.object({
   host: csv(HOST_TYPE_IDS),
   occasion: csv(OCCASION_KEYS),
   format: csv(FORMAT_IDS),
+  borough: csv(BOROUGH_KEYS),
+  neighborhood: csv(NEIGHBORHOODS.map((n) => n.key)),
   near: z.string().optional().refine((v) => !v || !!getNeighborhood(v)).catch(undefined),
   within: z.coerce.number().int().refine((v) => [1, 2, 5, 10].includes(v)).optional().catch(undefined),
+  when: z.enum(WHEN_KEYS).optional().catch(undefined),
   date: z.iso.date().optional().catch(undefined),
   from: z.iso.date().optional().catch(undefined),
   to: z.iso.date().optional().catch(undefined),
@@ -85,7 +92,9 @@ export function filtersToQuery(f: Partial<DiscoveryFilters>): string {
 export function activeFilterCount(f: DiscoveryFilters) {
   let n = 0;
   for (const k of ["category", "cuisine", "host", "occasion", "format"] as const) n += f[k].length ? 1 : 0;
-  for (const k of ["q", "near", "date", "from", "minPrice", "maxPrice", "spots", "collection"] as const) n += f[k] !== undefined ? 1 : 0;
+  for (const k of ["q", "near", "minPrice", "maxPrice", "spots", "collection"] as const) n += f[k] !== undefined ? 1 : 0;
+  if (f.when || f.date || f.from || f.to) n += 1;
+  if (f.borough.length || f.neighborhood.length) n += 1;
   return n;
 }
 
@@ -124,15 +133,13 @@ export function inCollection(l: Listing, key: CollectionKey): boolean {
   }
 }
 
+function intersect(a: { start: Date; end: Date } | null, b: { start: Date; end: Date } | null) {
+  if (!a || !b) return a ?? b;
+  return { start: new Date(Math.max(+a.start, +b.start)), end: new Date(Math.min(+a.end, +b.end)) };
+}
+
 function sessionWindow(f: DiscoveryFilters, now: Date): { start: Date; end: Date } | null {
-  if (f.collection === "this-weekend") return weekendWindow(now);
-  if (f.date) return nyDayRange(f.date);
-  if (f.from || f.to) {
-    const start = f.from ? nyDayRange(f.from).start : now;
-    const end = f.to ? nyDayRange(f.to).end : new Date(8640000000000000);
-    return { start, end };
-  }
-  return null;
+  return intersect(f.collection === "this-weekend" ? weekendWindow(now) : null, dateWindow(f, now));
 }
 
 /**
@@ -145,6 +152,7 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
   const origin = f.near ? getNeighborhood(f.near) : undefined;
   const window = sessionWindow(f, now);
   const q = f.q?.toLowerCase();
+  const inLocation = locationMatcher(f.borough, f.neighborhood);
 
   const out: ListingMatch[] = [];
   for (const l of listings) {
@@ -154,6 +162,7 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
     if (f.format.length && !f.format.includes(l.format as never)) continue;
     if (f.occasion.length && !f.occasion.some((o) => l.occasions.includes(o))) continue;
     if (f.collection && !inCollection(l, f.collection)) continue;
+    if (!inLocation(l.venue)) continue;
     if (q) {
       const hay = [l.title, l.summary, l.cuisine, l.host.displayName, l.venue.neighborhood, ...l.tags].join(" ").toLowerCase();
       if (!hay.includes(q)) continue;
@@ -162,7 +171,7 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
     const distance = origin ? distanceMiles(origin, l.venue) : null;
     if (origin && f.within && distance !== null && distance > f.within) continue;
 
-    let sessions: ListingSession[] = l.sessions.filter((s) => s.availability !== "PAST" && s.availability !== "CANCELLED");
+    let sessions: ListingSession[] = l.sessions.filter((s) => s.availability !== "PAST" && s.availability !== "CANCELLED" && s.startsAt > now);
     if (window) sessions = sessions.filter((s) => s.startsAt >= window.start && s.startsAt < window.end);
     if (f.minPrice !== undefined) sessions = sessions.filter((s) => s.priceCents >= f.minPrice! * 100);
     if (f.maxPrice !== undefined) sessions = sessions.filter((s) => s.priceCents <= f.maxPrice! * 100);
@@ -173,7 +182,7 @@ export function applyFilters(listings: Listing[], f: DiscoveryFilters, now: Date
     if (!sessions.length) continue;
 
     const bookable = sessions.find((s) => isBookable({ ...s, seatsReserved: s.capacity - s.seatsLeft, status: "SCHEDULED" }, now));
-    out.push({ ...l, matched: bookable ?? sessions[0], matchedCount: sessions.length, distance });
+    out.push({ ...l, matched: bookable ?? sessions[0], matchedCount: sessions.length, matchedSessions: sessions, distance });
   }
 
   return sortListings(out, f.sort ?? (origin ? "recommended" : "recommended"));

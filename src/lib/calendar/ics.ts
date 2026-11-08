@@ -13,6 +13,8 @@ export type IcsEvent = {
   status?: "CONFIRMED" | "CANCELLED" | "TENTATIVE";
   /** Bumped when an event changes (e.g. cancelled) so calendar apps update it. */
   sequence?: number;
+  /** Adds a display alarm this many hours before the start (handled by the guest's calendar app). */
+  alarmHoursBefore?: number;
 };
 
 export function escapeText(value: string) {
@@ -63,7 +65,11 @@ export function buildIcs(events: IcsEvent[], opts: { name: string; now: Date }) 
     if (e.description) lines.push(`DESCRIPTION:${escapeText(e.description)}`);
     if (e.location) lines.push(`LOCATION:${escapeText(e.location)}`);
     if (e.url) lines.push(`URL:${e.url}`);
-    lines.push(`STATUS:${e.status ?? "CONFIRMED"}`, `SEQUENCE:${e.sequence ?? 0}`, "END:VEVENT");
+    lines.push(`STATUS:${e.status ?? "CONFIRMED"}`, `SEQUENCE:${e.sequence ?? 0}`);
+    if (e.alarmHoursBefore && e.status !== "CANCELLED") {
+      lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeText(`Reminder: ${e.summary} starts in ${e.alarmHoursBefore} hours`)}`, `TRIGGER:-PT${e.alarmHoursBefore}H`, "END:VALARM");
+    }
+    lines.push("END:VEVENT");
   }
   lines.push("END:VCALENDAR");
   return lines.map(foldLine).join("\r\n") + "\r\n";

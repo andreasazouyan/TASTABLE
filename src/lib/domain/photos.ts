@@ -34,6 +34,15 @@ export const PHOTOS = {
   tacos: { src: unsplash("photo-1565299585323-38d6b0865b47"), alt: "Tacos on a plate" },
   noodles: { src: unsplash("photo-1569718212165-3a8278d5f624"), alt: "A bowl of noodle soup" },
   spices: { src: unsplash("photo-1596040033229-a9821ebd058d"), alt: "Bowls of colourful spices" },
+  pasta: { src: unsplash("photo-1473093295043-cdd812d0e601"), alt: "A plate of pasta" },
+  grill: { src: unsplash("photo-1555939594-58d7cb561ad1"), alt: "Food cooking over an open grill" },
+  spread: { src: unsplash("photo-1476224203421-9ac39bcb3327"), alt: "Small dishes shared across a table" },
+  vegBowl: { src: unsplash("photo-1512621776951-a57141f2eefd"), alt: "A bowl of fresh vegetables and grains" },
+  cheese: { src: unsplash("photo-1452195100486-9cc805987862"), alt: "Cheese on a wooden board" },
+  dumplings: { src: unsplash("photo-1563245372-f21724e3856d"), alt: "Steamed dumplings" },
+  brunch: { src: unsplash("photo-1482049016688-2d3e1b311543"), alt: "A brunch plate seen from above" },
+  bar: { src: unsplash("photo-1514933651103-005eec06c04b"), alt: "A softly lit bar" },
+  bread: { src: unsplash("photo-1549931319-a545dcf3bc73"), alt: "Loaves of freshly baked bread" },
 } as const;
 
 export type PhotoKey = keyof typeof PHOTOS;

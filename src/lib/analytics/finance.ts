@@ -17,6 +17,8 @@ export type FinanceBooking = {
   subtotalCents: number;
   serviceFeeCents: number;
   refundAmountCents: number;
+  /** Ticket-subtotal share kept on cancellation (null when not cancelled or unrecorded). */
+  cancellationFeeCents?: number | null;
   createdAt: Date;
   sessionId: string;
 };
@@ -33,8 +35,13 @@ export type FinanceSession = {
   status: string;
 };
 
-/** The part of a refund that came out of the host's ticket revenue (never the service fee). */
-export function hostRefundCents(b: Pick<FinanceBooking, "refundAmountCents" | "subtotalCents">) {
+/**
+ * The part of a refund that came out of the host's ticket revenue. When a cancellation fee is
+ * recorded, the host keeps exactly that fee (the rest of the ticket subtotal is refunded; any
+ * service fee refunded comes from the platform). Otherwise the refund is capped at the subtotal.
+ */
+export function hostRefundCents(b: Pick<FinanceBooking, "refundAmountCents" | "subtotalCents" | "cancellationFeeCents">) {
+  if (b.cancellationFeeCents !== null && b.cancellationFeeCents !== undefined && b.refundAmountCents > 0) return Math.max(b.subtotalCents - b.cancellationFeeCents, 0);
   return Math.min(b.refundAmountCents, b.subtotalCents);
 }
 

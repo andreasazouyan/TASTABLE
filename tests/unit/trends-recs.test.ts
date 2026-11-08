@@ -84,16 +84,54 @@ describe("recommendations", () => {
     const [top] = recommend(prefs, [c("class", { category: "COOKING_CLASS_WORKSHOP", cuisine: "japanese" }), c("dinner")]);
     expect(top.item.slug).toBe("class");
     expect(top.score).toBe(3 + 2 + 2);
-    expect(top.reasons).toEqual(["Hands-on, and you want to learn new skills", "In a category you chose", "Japanese, a cuisine you love"]);
+    expect(top.reasons).toEqual(["Matches your love for Japanese cuisine", "In a category you chose", "Hands-on, and you want to learn new skills"]);
   });
-  it("excludes items with no matching rule and is deterministic", () => {
+  it("ranks matches first, keeps non-matching items for discovery, and is deterministic", () => {
     const a = recommend(prefs, [c("x"), c("y", { cuisine: "japanese" }), c("z", { cuisine: "japanese" })]);
-    expect(a.map((r) => r.item.slug)).toEqual(["y", "z"]);
+    expect(a.map((r) => r.item.slug)).toEqual(["y", "z", "x"]);
+    expect(a[2]).toMatchObject({ discovery: true, reasons: ["Something different to discover"] });
     expect(recommend(prefs, [c("z", { cuisine: "japanese" }), c("y", { cuisine: "japanese" })]).map((r) => r.item.slug)).toEqual(["y", "z"]);
   });
   it("applies the travel radius as a hard filter", () => {
     const near = { ...prefs, locationKey: "soho", travelRadiusMiles: 2 };
     const far = c("far", { cuisine: "japanese", venueLat: 40.85, venueLng: -73.85 });
     expect(recommend(near, [far])).toEqual([]);
+  });
+
+  const at = (iso: string, h: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + (h + 5) * 3_600_000); // New York (EST) hour h
+  const sess = (id: string, iso: string, h: number) => ({ id, startsAt: at(iso, h), endsAt: at(iso, h + 2) });
+  const guest = { locationKey: "east-village", travelRadiusMiles: null, cuisines: ["italian"], categories: [], motivations: [] };
+
+  it("uses dishes, days and time slots, attendance and neighborhood, with the requested wording", () => {
+    const pizza = c("pizza", {
+      cuisine: "italian",
+      dishes: ["pizza"],
+      socialAtmosphere: "BRING_YOUR_PEOPLE",
+      venueNeighborhood: "East Village",
+      venueLat: 40.7265,
+      venueLng: -73.9815,
+      // Thursday noon, then Saturday 7pm (2026-11-14 is a Saturday).
+      sessions: [sess("s1", "2026-11-12", 12), sess("s2", "2026-11-14", 19)],
+    });
+    const [top] = recommend({ ...guest, dishes: ["pizza"], days: ["SAT"], timeSlots: ["18-20"], attendance: "FRIENDS_OR_PARTNER" }, [pizza]);
+    expect(top.reasons).toEqual([
+      "Featuring one of your favorite dishes: Pizza",
+      "Matches your love for Italian cuisine",
+      "Saturday, 6:00–8:00 PM: when you like to go out",
+      "Perfect for a night out with friends",
+      "In East Village, your neighborhood",
+    ]);
+    expect(top.session?.id).toBe("s2"); // the session that fits, not just the soonest
+  });
+
+  it("keeps variety: at most two picks per category before others", () => {
+    const many = ["a", "b", "c"].map((s) => c(s, { cuisine: "japanese", category: "COOKING_CLASS_WORKSHOP" }));
+    const other = c("d", { cuisine: "japanese", category: "SOCIAL_CULINARY" });
+    expect(recommend(prefs, [...many, other], 3).map((r) => r.item.slug)).toEqual(["a", "b", "d"]);
+  });
+
+  it("never claims a travel time", () => {
+    const recs = recommend({ ...guest, maxTravelMinutes: 20 }, [c("x", { cuisine: "italian", venueNeighborhood: "SoHo" })]);
+    expect(recs[0].reasons.join(" ")).not.toMatch(/min/);
   });
 });

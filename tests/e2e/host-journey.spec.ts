@@ -40,11 +40,40 @@ test("host: onboard, create and publish an event, it appears in discovery, a boo
   await host.getByLabel("Ticket price (USD)").fill("70");
   await host.getByLabel("Capacity").first().fill("10");
   await host.getByRole("button", { name: "Next" }).click();
-  await host.getByRole("button", { name: "Add a course or activity" }).click();
-  await host.getByLabel("Course 1 title").fill("Biang biang noodles");
+  // Menu: a course with two dishes, reordered, with a dietary label; then a featured dish.
+  await host.getByRole("button", { name: "Add a course" }).click();
+  await host.getByLabel("Course 1 name").fill("Noodles");
+  await host.getByLabel("Noodles item 1 dish name").fill("Biang biang noodles");
+  await host.getByRole("button", { name: "Add a dish to Noodles" }).click();
+  await host.getByLabel("Noodles item 2 dish name").fill("Smacked cucumber");
+  await host.getByRole("group", { name: "Noodles item 2 dietary labels" }).getByRole("button", { name: "Vegan" }).click();
+  await host.getByRole("button", { name: "Move Noodles item 2 up" }).click();
+  await expect(host.getByLabel("Noodles item 1 dish name")).toHaveValue("Smacked cucumber");
+  await host.getByLabel(/Featured dishes/).fill("Hand-pulled noodles");
+  await host.getByLabel(/Featured dishes/).press("Enter");
+  await expect(host.getByRole("button", { name: "Remove featured dish Hand-pulled noodles" })).toBeVisible();
+  await host.getByRole("button", { name: "Next" }).click();
+
+  // Itinerary with live chronology checks.
+  await host.getByRole("button", { name: "Add a step" }).click();
+  await host.getByLabel("Step 1 title").fill("Welcome tea");
+  await host.getByLabel("Step 1 ends, minutes after start").fill("30");
+  await host.getByRole("button", { name: "Add a step" }).click();
+  await host.getByLabel("Step 2 title").fill("Pull your own noodles");
+  await host.getByLabel("Step 2 starts, minutes after start").fill("10");
+  await expect(host.getByText("Step 2 starts before step 1 ends.").first()).toBeVisible();
+  await host.getByLabel("Step 2 starts, minutes after start").fill("30");
+  await expect(host.getByText("Step 2 starts before step 1 ends.")).toHaveCount(0);
   await host.getByRole("button", { name: "Next" }).click();
   await host.getByRole("button", { name: "Next" }).click();
+
+  // Preview before publishing.
   await expect(host.getByText("Ready to publish.")).toBeVisible();
+  const preview = host.getByRole("region", { name: "How guests will see it" });
+  await expect(preview.getByRole("heading", { name: "The Menu" })).toBeVisible();
+  await expect(preview.getByRole("listitem").filter({ hasText: "Smacked cucumber" }).getByText("Vegan")).toBeVisible();
+  await expect(preview.getByText("Welcome tea")).toBeVisible();
+  await expect(preview.getByText("7:30 PM")).toBeVisible();
   await host.getByRole("button", { name: "Publish event" }).click();
   await host.waitForURL(/\/host\/events\?status=PUBLISHED/);
   await expect(host.getByRole("heading", { name: TITLE })).toBeVisible();
@@ -55,7 +84,13 @@ test("host: onboard, create and publish an event, it appears in discovery, a boo
   await signInAs(guest, /Jordan .*demo guest/);
   await guest.goto(`/discover?q=${encodeURIComponent("Hand-Pulled Noodle")}`);
   await guest.getByRole("link", { name: new RegExp(TITLE) }).first().click();
-  await guest.getByRole("link", { name: "Book now" }).first().click();
+  const menu = guest.getByRole("region", { name: "The Menu" });
+  await expect(menu.getByText("Smacked cucumber")).toBeVisible();
+  await expect(menu.getByText("Biang biang noodles")).toBeVisible();
+  const timeline = guest.getByRole("region", { name: "Your Experience" });
+  await expect(timeline.getByText("7:00 PM")).toBeVisible();
+  await expect(timeline.getByText("Pull your own noodles")).toBeVisible();
+  await guest.getByRole("link", { name: /^Reserve \d+ seats?$/ }).first().click();
   await guest.getByRole("button", { name: "Add a ticket", exact: true }).click();
   await guest.getByRole("checkbox", { name: /cancellation policy/ }).check();
   await guest.getByRole("checkbox", { name: /simulated payment/ }).check();

@@ -1,4 +1,4 @@
-import { BarChart3, CalendarRange, LayoutDashboard, LineChart, UserRound, Wallet } from "lucide-react";
+import { BarChart3, CalendarRange, LayoutDashboard, Lightbulb, LineChart, UserRound, Wallet } from "lucide-react";
 
 import type { NavItem } from "@/lib/navigation/guest";
 
@@ -8,6 +8,7 @@ export const HOST_NAV: NavItem[] = [
   { href: "/host/reservations", label: "Reservations", icon: BarChart3 },
   { href: "/host/finances", label: "Finances", icon: Wallet },
   { href: "/host/trends", label: "Culinary Trends", icon: LineChart },
+  { href: "/host/insights", label: "Demand Insights", icon: Lightbulb },
   { href: "/host/profile", label: "Profile", icon: UserRound },
 ];
 

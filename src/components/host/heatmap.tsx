@@ -9,7 +9,7 @@ type Cell = { day: string; sessions: number; seatsOffered: number; fillRate: num
 export function DemandHeatmap({ rows, minSessions }: { rows: { slot: string; cells: Cell[] }[]; minSessions: number }) {
   const days = rows[0]?.cells.map((c) => c.day) ?? [];
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[36rem] border-separate border-spacing-[3px] text-xs">
         <caption className="sr-only">Seat fill rate by weekday and time of day. Each cell shows fill rate and number of sessions.</caption>
         <thead>

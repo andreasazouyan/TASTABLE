@@ -7,9 +7,11 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/demo";
 import { serverNow } from "@/lib/clock";
 import { db } from "@/lib/db";
+import { formatMoney } from "@/lib/format";
 import { checkoutFromFormData } from "@/lib/validation/checkout";
 import { cancelBooking, createBooking } from "@/server/services/bookings";
 import { DomainError } from "@/server/services/errors";
+import { dismissReminder } from "@/server/services/reminders";
 
 export type CheckoutState = { error?: string; fieldErrors?: Record<string, string[] | undefined> } | null;
 
@@ -76,10 +78,25 @@ export async function cancelBookingAction(_prev: CancelState, formData: FormData
     revalidateBookingViews();
     return {
       ok: true,
-      message: result.alreadyCancelled ? "This booking was already cancelled. Nothing else changed." : "Booking cancelled.",
+      message: result.alreadyCancelled
+        ? "This booking was already cancelled. Nothing else changed."
+        : `Booking cancelled. ${result.feeCents ? `A ${formatMoney(result.feeCents)} cancellation fee was kept and ` : ""}${formatMoney(result.refundCents)} ${result.feeCents ? "was" : "is being"} refunded (simulated).`,
     };
   } catch (e) {
     if (e instanceof DomainError) return { ok: false, message: e.message };
     throw e;
   }
+}
+
+/** Hides an in-app reminder for the signed-in guest. */
+export async function dismissReminderAction(formData: FormData) {
+  const reminderId = z.string().min(1).parse(formData.get("reminderId"));
+  const user = await getCurrentUser();
+  if (!user?.guestProfile) return;
+  try {
+    await dismissReminder(db, user.guestProfile.id, reminderId, serverNow());
+  } catch (e) {
+    if (!(e instanceof DomainError)) throw e;
+  }
+  revalidateBookingViews();
 }

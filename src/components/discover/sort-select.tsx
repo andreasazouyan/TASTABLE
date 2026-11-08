@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { SORTS, type SortKey } from "@/lib/discovery/filters";
 
-export function SortSelect({ value }: { value: SortKey }) {
+export function SortSelect({ value, defaultValue = "recommended" }: { value: SortKey; defaultValue?: SortKey }) {
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
@@ -15,7 +15,7 @@ export function SortSelect({ value }: { value: SortKey }) {
         value={value}
         onChange={(e) => {
           const sp = new URLSearchParams(search);
-          if (e.target.value === "recommended") sp.delete("sort");
+          if (e.target.value === defaultValue) sp.delete("sort");
           else sp.set("sort", e.target.value);
           router.push(`${pathname}${sp.size ? `?${sp}` : ""}`, { scroll: false });
         }}

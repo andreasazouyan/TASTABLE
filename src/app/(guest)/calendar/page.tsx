@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { CalendarPlus, ChevronLeft, ChevronRight, Lock, Share2 } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock, Lock, MapPin, Share2, Ticket } from "lucide-react";
 
+import { ReminderBanners } from "@/components/booking/reminder-banners";
 import { ShareButton } from "@/components/experiences/share-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,10 +19,26 @@ import { getCalendarItems, getSharingSettings, type CalendarItem, type CalendarI
 export const metadata: Metadata = { title: "Calendar" };
 
 const KIND_STYLE: Record<CalendarItemKind, { label: string; chip: string; dot: string }> = {
-  booking: { label: "Booked", chip: "bg-brand text-brand-foreground", dot: "bg-brand" },
-  saved: { label: "Saved", chip: "border border-foreground/30 bg-card text-foreground", dot: "border border-foreground/50 bg-card" },
-  invitation: { label: "Invitation", chip: "border border-dashed border-brand bg-brand-soft text-accent-foreground", dot: "border border-dashed border-brand bg-brand-soft" },
-  cancelled: { label: "Cancelled", chip: "bg-muted text-muted-foreground line-through", dot: "bg-muted-foreground/40" },
+  booking: {
+    label: "Booked",
+    chip: "bg-brand text-brand-foreground",
+    dot: "bg-brand",
+  },
+  saved: {
+    label: "Saved",
+    chip: "border border-foreground/30 bg-card text-foreground",
+    dot: "border border-foreground/50 bg-card",
+  },
+  invitation: {
+    label: "Invitation",
+    chip: "border border-dashed border-brand bg-brand-soft text-accent-foreground",
+    dot: "border border-dashed border-brand bg-brand-soft",
+  },
+  cancelled: {
+    label: "Cancelled",
+    chip: "bg-muted text-muted-foreground line-through",
+    dot: "bg-muted-foreground/40",
+  },
 };
 
 export default function CalendarPage(props: PageProps<"/calendar">) {
@@ -56,10 +73,84 @@ function ItemChip({ item, compact }: { item: CalendarItem; compact?: boolean }) 
       title={`${item.title} · ${formatTime(item.startsAt)} · ${s.label}`}
     >
       <span className="sr-only">{s.label}: </span>
-      {!compact && <span className="block text-xs opacity-80">{formatTime(item.startsAt)} · {item.detail}</span>}
+      {!compact && (
+        <span className="block text-xs opacity-80">
+          {formatTime(item.startsAt)} · {item.detail}
+        </span>
+      )}
       {compact && <span className="hidden sm:inline">{formatTime(item.startsAt)} </span>}
       {item.title}
     </Link>
+  );
+}
+
+const ITEM_ACTION: Record<CalendarItemKind, string> = {
+  booking: "View booking & ticket",
+  cancelled: "View booking",
+  saved: "View experience",
+  invitation: "View invitation",
+};
+
+/** The selected day: personal plans first, then a way into Discover for that date. */
+function DayPanel({ day, items, today }: { day: string; items: CalendarItem[]; today: string }) {
+  const past = day < today;
+  const label = formatDate(nyDateTime(day, 12), {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: day.slice(0, 4) === today.slice(0, 4) ? undefined : "numeric",
+  });
+  const discoverHref = `/discover?date=${day}`;
+  const hasBooking = items.some((i) => i.kind === "booking");
+  return (
+    <section id="selected-day" aria-labelledby="selected-day-title" className="scroll-mt-24 rounded-2xl border bg-card p-5 shadow-soft">
+      <p className="eyebrow mb-1">{day === today ? "Today" : past ? "Past day" : "Selected day"}</p>
+      <h2 id="selected-day-title" className="text-2xl">
+        {label}
+      </h2>
+      {!hasBooking && <p className="mt-3 text-sm text-muted-foreground">No experiences planned yet.</p>}
+      {items.length > 0 && (
+        <ul className="mt-4 space-y-3" aria-label={`Your plans on ${label}`}>
+          {items.map((it) => {
+            const s = KIND_STYLE[it.kind];
+            return (
+              <li key={it.id} className={cn("rounded-xl border p-3", it.kind === "booking" ? "border-brand/50 bg-brand-soft/40" : "bg-card")}>
+                <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium", s.chip, "no-underline")}>{it.status}</span>
+                <p className={cn("mt-1.5 font-medium leading-snug", it.kind === "cancelled" && "text-muted-foreground line-through")}>{it.title}</p>
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Clock className="size-3.5" aria-hidden />{" "}
+                  {formatDate(it.startsAt, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })}{" "}
+                  · {formatTime(it.startsAt)}
+                </p>
+                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <MapPin className="size-3.5" aria-hidden /> {it.place}
+                </p>
+                {it.tickets !== null && (
+                  <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Ticket className="size-3.5" aria-hidden /> {it.tickets} {it.tickets === 1 ? "ticket" : "tickets"}
+                  </p>
+                )}
+                <Link href={it.href} className="mt-2 inline-block text-sm font-medium text-brand underline-offset-4 hover:underline">
+                  {ITEM_ACTION[it.kind]}
+                  <span className="sr-only">: {it.title}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {past ? (
+        <p className="mt-4 text-xs text-muted-foreground">This day has passed, so there&apos;s nothing left to book.</p>
+      ) : (
+        <Button asChild className="mt-5 w-full" variant={items.length ? "outline" : "default"}>
+          <Link href={discoverHref}>{items.length ? "Explore experiences on this day" : "Discover experiences for this day"}</Link>
+        </Button>
+      )}
+    </section>
   );
 }
 
@@ -69,7 +160,8 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
   const now = await requestNow();
   const today = isoDateNY(now);
   const view = sp.view === "week" ? "week" : "month";
-  const anchor = typeof sp.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : today;
+  const isIso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+  const anchor = isIso(sp.date) ? sp.date : isIso(sp.day) ? sp.day : today;
 
   const days = view === "month" ? monthGrid(anchor).flat() : weekDays(anchor);
   const from = nyDateTime(days[0]);
@@ -85,10 +177,24 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
       ? formatDate(nyDateTime(anchor, 12), { month: "long", year: "numeric" })
       : `${formatDate(nyDateTime(days[0], 12), { month: "short", day: "numeric" })} – ${formatDate(nyDateTime(days[6], 12), { month: "short", day: "numeric", year: "numeric" })}`;
   const link = (patch: Record<string, string>) => `/calendar?${new URLSearchParams({ view, date: anchor, ...patch })}`;
+  // The selected day: chosen by the guest, else today when it's in view.
+  const selected = isIso(sp.day) ? sp.day : days.includes(today) ? today : null;
+  const selectedItems = selected
+    ? (byDate.get(selected) ?? (selected >= days[0] && selected <= days[days.length - 1] ? [] : await getCalendarItems(guest.id, nyDateTime(selected), nyDateTime(addDaysIso(selected, 1)))))
+    : [];
+  const selectHref = (d: string) => `${link({ day: d })}#selected-day`;
+  const dayName = (d: string) =>
+    formatDate(nyDateTime(d, 12), {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
   const shareUrl = sharing.pref?.shareToken ? `/c/${sharing.pref.shareToken}` : null;
 
   return (
     <>
+      <ReminderBanners guestId={guest.id} now={now} />
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow mb-2">Your plans</p>
@@ -116,72 +222,124 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
           <h2 className="ml-2 font-display text-2xl" aria-live="polite">
             {title}
           </h2>
-          <Link href={link({ date: today })} className="ml-2 text-sm text-brand underline-offset-4 hover:underline">
+          <Link href={link({ date: today, day: today })} className="ml-2 text-sm text-brand underline-offset-4 hover:underline">
             Today
           </Link>
         </div>
         <nav aria-label="Calendar view" className="inline-flex rounded-full bg-muted p-1 text-sm">
           {(["month", "week"] as const).map((v) => (
-            <Link key={v} href={link({ view: v })} aria-current={view === v ? "page" : undefined} className={cn("rounded-full px-4 py-1.5 capitalize", view === v ? "bg-card font-medium shadow-soft" : "text-muted-foreground")}>
+            <Link
+              key={v}
+              href={link({ view: v, ...(selected ? { date: selected, day: selected } : {}) })}
+              aria-current={view === v ? "page" : undefined}
+              className={cn("rounded-full px-4 py-1.5 capitalize", view === v ? "bg-card font-medium shadow-soft" : "text-muted-foreground")}
+            >
               {v}
             </Link>
           ))}
         </nav>
       </div>
       <Legend />
+      <p className="mt-2 text-xs text-muted-foreground">Tap a day to see your plans and explore what&apos;s on.</p>
 
-      {view === "month" ? (
-        <div className="mt-4 overflow-hidden rounded-2xl border bg-card shadow-soft" role="grid" aria-label={title}>
-          <div className="grid grid-cols-7 border-b bg-muted/50 text-center text-xs font-medium text-muted-foreground" role="row">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div key={d} className="py-2" role="columnheader">
-                {d}
+      <div className="mt-4 grid items-start gap-6 lg:grid-cols-[1fr_20rem]">
+        <div className="min-w-0">
+          {view === "month" ? (
+            <div className="overflow-hidden rounded-2xl border bg-card shadow-soft" role="grid" aria-label={title}>
+              <div className="grid grid-cols-7 border-b bg-muted/50 text-center text-xs font-medium text-muted-foreground" role="row">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+                  <div key={d} className="py-2" role="columnheader">
+                    {d}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {days.map((d) => {
-              const list = byDate.get(d) ?? [];
-              return (
-                <div
-                  key={d}
-                  role="gridcell"
-                  aria-label={`${formatDate(nyDateTime(d, 12), { weekday: "long", month: "long", day: "numeric" })}, ${list.length} items`}
-                  className={cn("min-h-20 border-r border-b p-1 last:border-r-0 sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0", !sameMonth(d, anchor) && "bg-muted/30 text-muted-foreground")}
-                >
-                  <span className={cn("mb-1 inline-grid size-6 place-items-center rounded-full text-xs", d === today && "bg-foreground font-semibold text-background")}>{Number(d.slice(8))}</span>
-                  <div className="space-y-1">
-                    {list.slice(0, 3).map((it) => (
-                      <ItemChip key={it.id} item={it} compact />
-                    ))}
-                    {list.length > 3 && <span className="block text-[11px] text-muted-foreground">+{list.length - 3} more</span>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+              <div className="grid grid-cols-7">
+                {days.map((d) => {
+                  const list = byDate.get(d) ?? [];
+                  const booked = list.some((i) => i.kind === "booking");
+                  const isSelected = d === selected;
+                  return (
+                    <div
+                      key={d}
+                      role="gridcell"
+                      aria-selected={isSelected}
+                      className={cn(
+                        "relative min-h-20 border-r border-b p-1 last:border-r-0 sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0",
+                        !sameMonth(d, anchor) && "bg-muted/30 text-muted-foreground",
+                        isSelected && "bg-brand-soft/50 ring-2 ring-brand ring-inset",
+                      )}
+                    >
+                      {/* The whole cell selects the day; event chips sit above it and open the event. */}
+                      <Link
+                        href={selectHref(d)}
+                        className="absolute inset-0 z-0 rounded-none outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset"
+                        aria-label={`Select ${dayName(d)}${list.length ? `, ${list.length} ${list.length === 1 ? "item" : "items"}` : ""}${booked ? ", booked" : ""}`}
+                        aria-current={d === today ? "date" : undefined}
+                      />
+                      <span className="pointer-events-none relative mb-1 flex items-center gap-1">
+                        <span
+                          className={cn(
+                            "inline-grid size-6 place-items-center rounded-full text-xs",
+                            d === today && "bg-foreground font-semibold text-background",
+                            isSelected && d !== today && "bg-brand font-semibold text-brand-foreground",
+                          )}
+                        >
+                          {Number(d.slice(8))}
+                        </span>
+                        {booked && <span aria-hidden className="size-1.5 rounded-full bg-brand" />}
+                      </span>
+                      <div className="relative z-10 space-y-1">
+                        {list.slice(0, 3).map((it) => (
+                          <ItemChip key={it.id} item={it} compact />
+                        ))}
+                        {list.length > 3 && <span className="pointer-events-none block text-[11px] text-muted-foreground">+{list.length - 3} more</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <ol className="grid gap-3 md:grid-cols-7 lg:grid-cols-1 xl:grid-cols-7">
+              {days.map((d) => {
+                const list = byDate.get(d) ?? [];
+                const booked = list.some((i) => i.kind === "booking");
+                return (
+                  <li key={d} className={cn("rounded-2xl border bg-card p-3 shadow-soft", d === today && "border-foreground", d === selected && "bg-brand-soft/50 ring-2 ring-brand")}>
+                    <Link
+                      href={selectHref(d)}
+                      className="mb-2 flex items-center gap-1.5 rounded text-sm font-medium underline-offset-4 hover:underline"
+                      aria-label={`Select ${dayName(d)}${list.length ? `, ${list.length} ${list.length === 1 ? "item" : "items"}` : ""}`}
+                      aria-current={d === today ? "date" : undefined}
+                    >
+                      {formatDate(nyDateTime(d, 12), {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                      {booked && <span aria-hidden className="size-1.5 rounded-full bg-brand" />}
+                    </Link>
+                    {list.length ? (
+                      <div className="space-y-2">
+                        {list.map((it) => (
+                          <ItemChip key={it.id} item={it} />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Nothing planned</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
         </div>
-      ) : (
-        <ol className="mt-4 grid gap-3 md:grid-cols-7">
-          {days.map((d) => {
-            const list = byDate.get(d) ?? [];
-            return (
-              <li key={d} className={cn("rounded-2xl border bg-card p-3 shadow-soft", d === today && "border-foreground")}>
-                <p className="mb-2 text-sm font-medium">{formatDate(nyDateTime(d, 12), { weekday: "short", month: "short", day: "numeric" })}</p>
-                {list.length ? (
-                  <div className="space-y-2">
-                    {list.map((it) => (
-                      <ItemChip key={it.id} item={it} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Nothing planned</p>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      )}
+        {selected ? (
+          <DayPanel day={selected} items={selectedItems} today={today} />
+        ) : (
+          <p className="rounded-2xl border border-dashed p-5 text-sm text-muted-foreground">Select a day to see your plans and explore experiences on that date.</p>
+        )}
+      </div>
 
       <section aria-labelledby="sharing-title" className="mt-12 grid gap-6 rounded-2xl border bg-card p-6 shadow-soft lg:grid-cols-[1fr_1.2fr]">
         <div>
@@ -189,8 +347,8 @@ async function Calendar({ searchParams }: PageProps<"/calendar">) {
             <Share2 className="size-5 text-brand" aria-hidden /> Share your calendar
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your bookings are private by default. Choose exactly which upcoming events friends can see. Shared pages show the event, date and
-            neighborhood only: never ticket counts, booking references, names or emails.
+            Your bookings are private by default. Choose exactly which upcoming events friends can see. Shared pages show the event, date and neighborhood only: never ticket counts, booking
+            references, names or emails.
           </p>
           {shareUrl ? (
             <div className="mt-5 space-y-3">

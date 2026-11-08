@@ -6,8 +6,10 @@ import { CreditCard, Minus, Plus, ShieldCheck, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { clampPartySize, partySizeRange } from "@/lib/booking/party-size";
 import { MAX_TICKETS_PER_BOOKING, quote } from "@/lib/booking/pricing";
 import { formatMoney } from "@/lib/format";
+import { CHECKOUT_POLICY_NOTICE, LATE_FEE_PERCENT, lateFeeCents } from "@/lib/booking/cancellation";
 import { cn } from "@/lib/utils";
 import { checkoutAction, type CheckoutState } from "@/server/actions/bookings";
 
@@ -15,6 +17,8 @@ type Props = {
   sessionId: string;
   unitPriceCents: number;
   seatsLeft: number;
+  /** Quantity picked on the event page (raw URL value; clamped here). */
+  initialSeats?: string;
   policyName: string;
   policyLines: string[];
   defaultName: string;
@@ -45,8 +49,11 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
  */
 export function CheckoutForm(p: Props) {
   const max = Math.min(MAX_TICKETS_PER_BOOKING, p.seatsLeft);
-  const [tickets, setTickets] = useState(Math.min(1, max));
+  const [tickets, setTickets] = useState(() => Math.min(max, clampPartySize(p.initialSeats, partySizeRange(p.seatsLeft))));
   const [state, action, pending] = useActionState<CheckoutState, FormData>(checkoutAction, null);
+  // Controlled so a guest's ticks survive a server-side validation error (React resets uncontrolled forms).
+  const [ackPolicy, setAckPolicy] = useState(false);
+  const [ackSimulated, setAckSimulated] = useState(false);
   const price = quote(p.unitPriceCents, Math.max(1, tickets));
   const fe = state?.fieldErrors ?? {};
 
@@ -61,7 +68,7 @@ export function CheckoutForm(p: Props) {
             <div>
               <p className="font-medium">General admission</p>
               <p className="text-sm text-muted-foreground">
-                {formatMoney(p.unitPriceCents)} each · {p.seatsLeft} {p.seatsLeft === 1 ? "seat" : "seats"} left
+                {formatMoney(p.unitPriceCents)} per seat · {p.seatsLeft} {p.seatsLeft === 1 ? "seat" : "seats"} left
               </p>
             </div>
             <div className="flex items-center gap-2" role="group" aria-label="Ticket quantity">
@@ -137,9 +144,16 @@ export function CheckoutForm(p: Props) {
               <li key={l}>{l}</li>
             ))}
           </ul>
+          <div className="mt-4 rounded-xl border border-brand/40 bg-brand-soft/50 p-4 text-sm" data-testid="late-fee-notice">
+            <p className="font-medium text-accent-foreground">{CHECKOUT_POLICY_NOTICE}</p>
+            <p className="mt-1 text-muted-foreground">
+              For this booking, a late cancellation fee would be {formatMoney(lateFeeCents(price.subtotalCents))} ({LATE_FEE_PERCENT}% of the {formatMoney(price.subtotalCents)} ticket
+              subtotal). It&apos;s kept from what you paid and the rest is refunded, never charged on top.
+            </p>
+          </div>
           <label className="mt-4 flex items-start gap-3 text-sm">
-            <input type="checkbox" name="acknowledgePolicy" className="mt-0.5 size-4 accent-[var(--brand)]" required aria-invalid={!!fe.acknowledgePolicy} />
-            <span>I&apos;ve read the cancellation policy and understand the refund terms.</span>
+            <input type="checkbox" name="acknowledgePolicy" checked={ackPolicy} onChange={(e) => setAckPolicy(e.target.checked)} className="mt-0.5 size-4 accent-[var(--brand)]" required aria-invalid={!!fe.acknowledgePolicy} />
+            <span>I&apos;ve read the cancellation policy and accept the {LATE_FEE_PERCENT}% fee for cancellations made less than 24 hours before the event.</span>
           </label>
           <FieldError messages={fe.acknowledgePolicy} />
         </Step>
@@ -155,7 +169,7 @@ export function CheckoutForm(p: Props) {
             </div>
           </div>
           <label className="mt-4 flex items-start gap-3 text-sm">
-            <input type="checkbox" name="acknowledgeSimulated" className="mt-0.5 size-4 accent-[var(--brand)]" required aria-invalid={!!fe.acknowledgeSimulated} />
+            <input type="checkbox" name="acknowledgeSimulated" checked={ackSimulated} onChange={(e) => setAckSimulated(e.target.checked)} className="mt-0.5 size-4 accent-[var(--brand)]" required aria-invalid={!!fe.acknowledgeSimulated} />
             <span>I understand this is a simulated payment for a fictional sample event.</span>
           </label>
           <FieldError messages={fe.acknowledgeSimulated} />

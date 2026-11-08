@@ -72,8 +72,7 @@ describe("booking service (simulated payments, seeded test DB)", () => {
     const s = await openSession(2);
     const booking = await createBooking(db, input(s.id, 2), now);
     const preview = await previewCancellation(db, booking.id, guest, now);
-    expect(preview.tier).toBe("FULL");
-    expect(preview.refundCents).toBe(booking.subtotalCents);
+    expect(preview).toMatchObject({ onTime: true, feeCents: 0, refundCents: booking.totalPriceCents });
 
     const first = await cancelBooking(db, { bookingId: booking.id, actor: "GUEST", guestId: guest }, now);
     expect(first.alreadyCancelled).toBe(false);
@@ -93,12 +92,56 @@ describe("booking service (simulated payments, seeded test DB)", () => {
     expect(tickets.every((t) => t.status === "CANCELLED")).toBe(true);
   });
 
-  it("applies the 50% tier between 24 and 48 hours", async () => {
+  it("new bookings: free 24h+ before, 25% of the subtotal later, kept from the payment, never after the start", async () => {
+    const s = await openSession(3);
+    const b = await createBooking(db, input(s.id, 3), now);
+    expect(b.cancellationPolicyId).toBe("pol_late_fee_24h_25");
+    expect(JSON.parse(b.policySnapshot)).toMatchObject({ kind: "LATE_FEE", freeCancellationHours: 24, lateFeePercent: 25 });
+    const reminder = await db.bookingReminder.findUniqueOrThrow({ where: { bookingId: b.id } });
+    expect(reminder.remindAt.getTime()).toBe(s.startsAt.getTime() - 24 * 3_600_000);
+
+    const at = (h: number) => new Date(s.startsAt.getTime() - h * 3_600_000);
+    expect((await previewCancellation(db, b.id, guest, at(25))).feeCents).toBe(0);
+    expect((await previewCancellation(db, b.id, guest, at(24))).feeCents).toBe(0);
+    const late = await previewCancellation(db, b.id, guest, at(23));
+    expect(late.feeCents).toBe(Math.round(b.subtotalCents * 0.25));
+    await expect(cancelBooking(db, { bookingId: b.id, actor: "GUEST", guestId: guest }, new Date(s.startsAt.getTime() + 60_000))).rejects.toThrow(/already started/);
+
+    const seatsBefore = (await db.experienceSession.findUniqueOrThrow({ where: { id: s.id } })).seatsReserved;
+    const r = await cancelBooking(db, { bookingId: b.id, actor: "GUEST", guestId: guest }, at(23));
+    expect(r.refundCents).toBe(b.totalPriceCents - late.feeCents);
+    expect(r.booking).toMatchObject({ status: "CANCELLED", cancellationFeeCents: late.feeCents, cancellationFeePercent: 25, refundAmountCents: b.totalPriceCents - late.feeCents, paymentStatus: "SIMULATED_PARTIALLY_REFUNDED" });
+    expect((await db.experienceSession.findUniqueOrThrow({ where: { id: s.id } })).seatsReserved).toBe(seatsBefore - 3);
+    expect((await db.bookingTicket.findMany({ where: { bookingId: b.id } })).every((t) => t.status === "CANCELLED")).toBe(true);
+    expect((await db.bookingReminder.findUniqueOrThrow({ where: { bookingId: b.id } })).status).toBe("CANCELLED");
+
+    // Idempotent: a repeat never charges the fee twice or changes the refund.
+    const again = await cancelBooking(db, { bookingId: b.id, actor: "GUEST", guestId: guest }, at(1));
+    expect(again.alreadyCancelled).toBe(true);
+    expect(again.booking.cancellationFeeCents).toBe(late.feeCents);
+    expect(again.refundCents).toBe(r.refundCents);
+  });
+
+  it("a later policy change never alters an existing booking's terms", async () => {
     const s = await openSession(1);
-    const booking = await createBooking(db, input(s.id, 1), now);
-    const thirtyHoursBefore = new Date(s.startsAt.getTime() - 30 * 3_600_000);
-    const r = await cancelBooking(db, { bookingId: booking.id, actor: "GUEST", guestId: guest }, thirtyHoursBefore);
-    expect(r.refundCents).toBe(Math.round(booking.subtotalCents / 2));
+    const b = await createBooking(db, input(s.id, 1), now);
+    await db.cancellationPolicy.update({ where: { id: "pol_late_fee_24h_25" }, data: { lateFeePercent: 50, version: { increment: 1 } } });
+    try {
+      const p = await previewCancellation(db, b.id, guest, new Date(s.startsAt.getTime() - 2 * 3_600_000));
+      expect(p.feePercent).toBe(25);
+    } finally {
+      await db.cancellationPolicy.update({ where: { id: "pol_late_fee_24h_25" }, data: { lateFeePercent: 25, version: 1 } });
+    }
+  });
+
+  it("bookings made before the new policy keep their tiered terms (50% between 24 and 48 hours)", async () => {
+    const legacy = await db.booking.findFirstOrThrow({
+      where: { status: "CONFIRMED", cancellationPolicy: { key: "STANDARD_48H" }, session: { startsAt: { gt: new Date(now.getTime() + 72 * 3_600_000) } } },
+      include: { session: true },
+    });
+    const thirtyHoursBefore = new Date(legacy.session.startsAt.getTime() - 30 * 3_600_000);
+    const r = await cancelBooking(db, { bookingId: legacy.id, actor: "GUEST", guestId: legacy.guestId }, thirtyHoursBefore);
+    expect(r.refundCents).toBe(Math.round(legacy.subtotalCents / 2));
     expect(r.booking.paymentStatus).toBe("SIMULATED_PARTIALLY_REFUNDED");
   });
 

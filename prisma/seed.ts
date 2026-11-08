@@ -14,9 +14,10 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { directDatabaseUrl } from "../src/lib/database-url";
 import { quote } from "../src/lib/booking/pricing";
-import { computeRefund, policySnapshot } from "../src/lib/booking/refunds";
+import { cancellationFee, computeRefund, policySnapshot } from "../src/lib/booking/refunds";
 import { nyDateTime, serverNow } from "../src/lib/clock";
 import { getNeighborhood } from "../src/lib/domain/neighborhoods";
+import { EVENT_IMAGE_CREDIT, eventImagesFor } from "../src/lib/domain/event-images";
 import { PHOTOS } from "../src/lib/domain/photos";
 import { isoDateNY } from "../src/lib/format";
 import {
@@ -28,6 +29,9 @@ import {
   VENUES,
   type ExperienceSeed,
 } from "./seed-data";
+import { seedFoundation } from "./seed-foundation";
+import { reminderTime } from "../src/lib/booking/cancellation";
+import { seedReginasTable } from "./seed-regina";
 
 const db = new PrismaClient({
   adapter: new PrismaPg({ connectionString: directDatabaseUrl() }),
@@ -69,6 +73,13 @@ const hoursMs = (n: number) => n * 3_600_000;
 
 async function wipe() {
   // Children first. The database enforces foreign keys, so order matters.
+  await db.reviewReport.deleteMany();
+  await db.review.deleteMany();
+  await db.guestFavoriteDish.deleteMany();
+  await db.experienceDish.deleteMany();
+  await db.experienceItineraryStep.deleteMany();
+  await db.experienceMenuItem.deleteMany();
+  await db.experienceMenuSection.deleteMany();
   await db.calendarShareItem.deleteMany();
   await db.calendarSharingPreference.deleteMany();
   await db.eventInvitation.deleteMany();
@@ -208,7 +219,13 @@ async function main() {
         featured: e.featured ?? false,
         isFictional: true,
         photos: {
-          create: e.photos.map((key, i) => ({ url: PHOTOS[key].src, alt: PHOTOS[key].alt, credit: "Unsplash (placeholder)", sortOrder: i })),
+          // Tastable's own image (matched by filename) leads when there is one; placeholders follow.
+          create: [
+            ...eventImagesFor(e.slug).map((p) => ({ ...p, credit: EVENT_IMAGE_CREDIT })),
+            ...e.photos.map((key) => ({ url: PHOTOS[key].src, alt: PHOTOS[key].alt, credit: "Unsplash (placeholder)" })),
+          ]
+            .slice(0, 3)
+            .map((p, i) => ({ ...p, sortOrder: i })),
         },
       },
     });
@@ -380,6 +397,9 @@ async function main() {
         dietaryRequirements: rand() < 0.2 ? pick(["Vegetarian", "No shellfish", "Nut allergy", "Gluten-free", "Vegan"]) : null,
         policyAcknowledgedAt: createdAt,
         policySnapshot: policySnapshot(policy),
+        cancellationPolicyId: policyIds.get(e.policy)!,
+        cancellationPolicyVersion: 1,
+        ...(args.cancel ? (({ feeCents, feePercent }) => ({ cancellationFeeCents: feeCents, cancellationFeePercent: feePercent }))(cancellationFee(price, { tier: "FULL", refundCents: refund })) : {}),
         cancelledAt,
         cancelledBy: args.cancel ? "GUEST" : null,
         cancellationReason: args.cancel ? pick(["Plans changed", "Feeling unwell", "Travel conflict"]) : null,
@@ -562,7 +582,23 @@ async function main() {
     });
   }
 
+  const foundation = await seedFoundation(db, NOW);
+
+  // In-app reminders, 24 hours before, for confirmed bookings of upcoming sessions (shown in Tastable only).
+  const upcomingBookings = await db.booking.findMany({
+    where: { status: "CONFIRMED", session: { status: "SCHEDULED", startsAt: { gt: NOW } } },
+    select: { id: true, session: { select: { startsAt: true } } },
+  });
+  await db.bookingReminder.createMany({
+    data: upcomingBookings.map((b) => ({ id: `rem_${b.id}`, bookingId: b.id, remindAt: reminderTime(b.session.startsAt), createdAt: NOW })),
+  });
+
+  // Regina's Table: the one-time demo event on a fixed date (own step, no RNG; see seed-regina.ts).
+  const regina = await seedReginasTable(db, NOW);
+
   const counts = {
+    ...foundation,
+    reginasTable: regina,
     users: await db.user.count(),
     hosts: await db.hostProfile.count(),
     venues: await db.venue.count(),

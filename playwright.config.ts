@@ -11,6 +11,8 @@ const env = {
   DEMO_AUTH_SECRET: "e2e-secret",
   SIMULATED_PAYMENTS_MODE: "succeed",
   NEXT_PUBLIC_APP_URL: `http://localhost:${PORT}`,
+  // Shows the developer-only "Reset demo event" control in the production build under test.
+  TASTABLE_DEMO_TOOLS: "true",
 };
 
 export default defineConfig({

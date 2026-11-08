@@ -28,7 +28,7 @@ test("guest: discover, filter, book two tickets, see ticket and calendar, cancel
   await page.locator("article a").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByText(/Cancellation policy/i).first()).toBeVisible();
-  await page.getByRole("link", { name: "Book now" }).first().click();
+  await page.getByRole("link", { name: /^Reserve \d+ seats?$/ }).first().click();
   await expect(page.getByText(/Demo payment · nothing will be charged/)).toBeVisible();
   await expect(page.locator('input[autocomplete="cc-number"]')).toHaveCount(0);
 
@@ -65,7 +65,8 @@ test("guest: discover, filter, book two tickets, see ticket and calendar, cancel
   await page.goto(`/bookings/${reference}`);
   await page.getByRole("button", { name: /Cancel booking/ }).click();
   const confirm = page.getByRole("button", { name: /Confirm cancellation · refund \$/ });
-  await expect(confirm).toBeVisible();
+  await expect(confirm).toBeDisabled();
+  await page.getByRole("checkbox", { name: /I understand the fee is \$0\.00/ }).check();
   await confirm.click();
   await expect(page.getByRole("status").filter({ hasText: /cancelled/i }).first()).toBeVisible();
 

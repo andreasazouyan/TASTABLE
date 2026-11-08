@@ -131,7 +131,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Make the dough", "Flour, eggs and technique"), course("Shape three pastas", "Tagliatelle, tortelli, orecchiette"), course("Shared dinner", "Your pasta with two sauces")],
     inclusions: ["All ingredients and equipment", "A glass of wine", "Printed recipes", "Pasta to take home"],
     host: "luca-moretti", venue: "chelsea-studio", priceDollars: 95, durationMinutes: 180, capacity: 14, policy: "STANDARD_48H",
-    photos: ["kitchenClass", "ingredients", "bowl"], featured: true, weekdays: [3, 6], hour: 18, fill: "busy", popularity: 1.5,
+    photos: ["pasta", "kitchenClass", "ingredients"], featured: true, weekdays: [3, 6], hour: 18, fill: "busy", popularity: 1.5,
   },
   {
     slug: "harlem-art-gallery-dinner", title: "Art Gallery Dinner Collaboration",
@@ -155,7 +155,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Chaat", "Three kinds"), course("Dal and breads", ""), course("Biryani", "Slow-cooked, family style"), course("Kulfi", "Pistachio and cardamom")],
     inclusions: ["Family-style dinner", "Welcome cocktail or mocktail", "Photo moment with the host"],
     host: "priya-raman", venue: "lic-rooftop", priceDollars: 110, durationMinutes: 180, capacity: 36, policy: "STANDARD_48H",
-    photos: ["evening", "feast", "spices"], featured: true, weekdays: [6], hour: 18, fill: "sold-out", popularity: 2.2,
+    photos: ["evening", "spices", "toast"], featured: true, weekdays: [6], hour: 18, fill: "sold-out", popularity: 2.2,
   },
   {
     slug: "international-newcomers-social-dinner", title: "International Newcomers Social Dinner",
@@ -167,7 +167,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Shared starters", "From the host's travels"), course("Main", "Tacos al pastor or mushroom tacos"), course("Dessert", "Churros")],
     inclusions: ["Three courses", "One drink", "Conversation cards"],
     host: "sofia-alvarez", venue: "bushwick-loft", priceDollars: 45, durationMinutes: 150, capacity: 28, policy: "FLEXIBLE_24H",
-    photos: ["toast", "tacos", "tables"], featured: true, weekdays: [4], hour: 19, fill: "open", popularity: 1.2,
+    photos: ["toast", "dumplings", "tables"], featured: true, weekdays: [4], hour: 19, fill: "open", popularity: 1.2,
   },
   {
     slug: "french-pastry-workshop", title: "French Pastry Workshop",
@@ -215,7 +215,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Doubles", "With tamarind"), course("Jerk chicken or jackfruit", ""), course("Fire-roasted corn", ""), course("Rum cake", "")],
     inclusions: ["Family-style meal", "Sorrel punch", "Lawn games"],
     host: "marcus-bell", venue: "red-hook-yard", priceDollars: 65, durationMinutes: 180, capacity: 40, policy: "STANDARD_48H",
-    photos: ["steak", "feast", "toast"], weekdays: [6, 0], hour: 15, fill: "busy", popularity: 1.3,
+    photos: ["grill", "steak", "toast"], weekdays: [6, 0], hour: 15, fill: "busy", popularity: 1.3,
   },
   {
     slug: "levantine-mezze-workshop", title: "Levantine Mezze Workshop",
@@ -227,7 +227,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Hummus and muhammara", ""), course("Fattoush", ""), course("Flatbread", "Baked to order"), course("Shared table", "")],
     inclusions: ["Ingredients", "Mint tea", "Recipe booklet"],
     host: "noor-haddad", venue: "astoria-home", priceDollars: 75, durationMinutes: 150, capacity: 14, policy: "FLEXIBLE_24H",
-    photos: ["bowl", "spices", "feast"], weekdays: [0, 3], hour: 18, fill: "open", popularity: 1.2,
+    photos: ["spread", "bowl", "kitchenClass"], weekdays: [0, 3], hour: 18, fill: "open", popularity: 1.2,
   },
   {
     slug: "levantine-long-table-dinner", title: "A Levantine Long-Table Dinner",
@@ -239,7 +239,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Mezze", "Six dishes"), course("Lamb shoulder", "Or stuffed eggplant"), course("Knafeh", "")],
     inclusions: ["Three courses", "Arak or mocktail welcome"],
     host: "noor-haddad", venue: "soho-loft", priceDollars: 95, durationMinutes: 180, capacity: 20, policy: "STANDARD_48H",
-    photos: ["feast", "diningRoom", "wine"], weekdays: [5], hour: 19, fill: "nearly", popularity: 1.4,
+    photos: ["diningRoom", "spread", "wine"], weekdays: [5], hour: 19, fill: "nearly", popularity: 1.4,
   },
   {
     slug: "greenhouse-plant-based-supper", title: "Greenhouse Plant-Based Supper",
@@ -251,7 +251,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Garden crudo", ""), course("Charred greens", ""), course("Squash agnolotti", ""), course("Mushroom main", ""), course("Stone fruit", "")],
     inclusions: ["Five courses", "Herbal welcome drink"],
     host: "green-fork", venue: "greenpoint-greenhouse", priceDollars: 85, durationMinutes: 150, capacity: 24, policy: "STANDARD_48H",
-    photos: ["bowl", "market", "evening"], weekdays: [4, 5], hour: 19, fill: "open", popularity: 1.0,
+    photos: ["vegBowl", "market", "evening"], weekdays: [4, 5], hour: 19, fill: "open", popularity: 1.0,
   },
   {
     slug: "wine-and-cheese-social", title: "Natural Wine & Cheese Social",
@@ -263,7 +263,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Six pairings", "From fresh to funky")],
     inclusions: ["Six wine pours", "Cheese board", "Tasting notes"],
     host: "sam-whitfield", venue: "fort-greene-bar", priceDollars: 55, durationMinutes: 120, capacity: 26, policy: "FLEXIBLE_24H",
-    photos: ["wine", "cocktails", "tables"], weekdays: [4], hour: 19, fill: "busy", popularity: 1.3,
+    photos: ["cheese", "wine", "tables"], weekdays: [4], hour: 19, fill: "busy", popularity: 1.3,
   },
   {
     slug: "dumbo-dumpling-class", title: "Dumpling Folding Class",
@@ -275,7 +275,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Fillings", "Pork and chive or mushroom"), course("Folding", "Three styles"), course("Cook and share", "")],
     inclusions: ["Ingredients", "Tea", "Recipe card"],
     host: "jiwoo-park", venue: "dumbo-studio", priceDollars: 65, durationMinutes: 150, capacity: 16, policy: "STANDARD_48H",
-    photos: ["noodles", "kitchenClass", "ingredients"], weekdays: [3, 6], hour: 18, fill: "nearly", popularity: 1.2,
+    photos: ["dumplings", "kitchenClass", "noodles"], weekdays: [3, 6], hour: 18, fill: "nearly", popularity: 1.2,
   },
   {
     slug: "harlem-brunch-supper-club", title: "Sunday Brunch Supper Club",
@@ -287,7 +287,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Waakye bowl", ""), course("Plantains", ""), course("Sweet bites", "")],
     inclusions: ["Brunch", "Coffee and juice"],
     host: "ama-owusu", venue: "lenox-gallery", priceDollars: 55, durationMinutes: 150, capacity: 30, policy: "FLEXIBLE_24H",
-    photos: ["toast", "feast", "dessert"], weekdays: [0], hour: 11, fill: "open", popularity: 1.0,
+    photos: ["brunch", "feast", "toast"], weekdays: [0], hour: 11, fill: "open", popularity: 1.0,
   },
   {
     slug: "east-village-taco-pop-up", title: "One-Night Taco Pop-Up",
@@ -311,7 +311,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Five pairings", "Junmai to nigori")],
     inclusions: ["Five pours", "Five small plates", "Tasting sheet"],
     host: "maya-chen", venue: "kiln-counter", priceDollars: 80, durationMinutes: 90, capacity: 12, policy: "STANDARD_48H",
-    photos: ["sushi", "wine", "cocktails"], weekdays: [3], hour: 18, fill: "busy", popularity: 1.1,
+    photos: ["bar", "sushi", "noodles"], weekdays: [3], hour: 18, fill: "busy", popularity: 1.1,
   },
   {
     slug: "bread-and-butter-workshop", title: "Sourdough & Cultured Butter Workshop",
@@ -323,7 +323,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Starter care", ""), course("Shaping and scoring", ""), course("Butter", "Cultured and salted")],
     inclusions: ["Ingredients", "Starter to take home", "Loaf and butter"],
     host: "claire-dubois", venue: "village-pastry", priceDollars: 85, durationMinutes: 180, capacity: 10, policy: "STANDARD_48H",
-    photos: ["pastry", "ingredients", "kitchenClass"], weekdays: [6], hour: 13, fill: "open", popularity: 0.9,
+    photos: ["bread", "pastry", "ingredients"], weekdays: [6], hour: 13, fill: "open", popularity: 0.9,
   },
   {
     slug: "bronx-supper-for-strangers", title: "Supper for Strangers in the Bronx",
@@ -335,7 +335,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Saltfish fritters", ""), course("Curry goat or chickpea curry", ""), course("Black cake", "")],
     inclusions: ["Three courses", "Sorrel punch"],
     host: "marcus-bell", venue: "mott-haven-hall", priceDollars: 50, durationMinutes: 150, capacity: 40, policy: "FLEXIBLE_24H",
-    photos: ["feast", "tables", "toast"], weekdays: [4], hour: 19, fill: "open", popularity: 0.9,
+    photos: ["tables", "feast", "toast"], weekdays: [4], hour: 19, fill: "open", popularity: 0.9,
   },
   {
     slug: "soho-loft-chefs-dinner", title: "Loft Dinner with a Visiting Chef",
@@ -347,7 +347,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Six courses", "Announced the week before")],
     inclusions: ["Six courses", "Welcome champagne"],
     host: "the-hidden-table", venue: "soho-loft", priceDollars: 180, durationMinutes: 180, capacity: 20, policy: "STRICT_7D",
-    photos: ["platedDish", "diningRoom", "dessert"], weekdays: [5, 6], hour: 19, fill: "nearly", popularity: 1.4,
+    photos: ["restaurantInterior", "platedDish", "steak"], weekdays: [5, 6], hour: 19, fill: "nearly", popularity: 1.4,
   },
   {
     slug: "spice-market-walk", title: "Jackson Heights Spice Walk & Tasting",
@@ -359,7 +359,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Ten tastings", "Chaat, momos, sweets")],
     inclusions: ["All tastings", "Chai", "Map of stops"],
     host: "priya-raman", venue: "lic-rooftop", priceDollars: 35, durationMinutes: 150, capacity: 14, policy: "FLEXIBLE_24H",
-    photos: ["market", "spices", "noodles"], weekdays: [0], hour: 12, fill: "busy", popularity: 1.1,
+    photos: ["spices", "market", "noodles"], weekdays: [0], hour: 12, fill: "busy", popularity: 1.1,
   },
   {
     slug: "cocktail-and-canape-class", title: "Cocktails & Canapés for Hosting",
@@ -371,7 +371,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Three cocktails", ""), course("Four canapés", "")],
     inclusions: ["All drinks and food", "Hosting guide"],
     host: "sam-whitfield", venue: "fort-greene-bar", priceDollars: 90, durationMinutes: 120, capacity: 18, policy: "STANDARD_48H",
-    photos: ["cocktails", "platedDish", "toast"], weekdays: [3], hour: 19, fill: "open", popularity: 0.8,
+    photos: ["cocktails", "bar", "platedDish"], weekdays: [3], hour: 19, fill: "open", popularity: 0.8,
   },
   {
     slug: "greenmarket-cooking-class", title: "Greenmarket Cooking Class",
@@ -383,7 +383,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Market walk", ""), course("Cook together", "Three dishes"), course("Lunch", "")],
     inclusions: ["Produce", "Lunch", "Seasonal recipe zine"],
     host: "green-fork", venue: "greenpoint-greenhouse", priceDollars: 60, durationMinutes: 210, capacity: 12, policy: "FLEXIBLE_24H",
-    photos: ["market", "ingredients", "bowl"], weekdays: [6], hour: 10, fill: "busy", popularity: 0.9,
+    photos: ["market", "vegBowl", "ingredients"], weekdays: [6], hour: 10, fill: "busy", popularity: 0.9,
   },
   {
     slug: "anniversary-tasting-for-two", title: "Candlelit Tasting for Two",
@@ -395,7 +395,7 @@ export const EXPERIENCES: ExperienceSeed[] = [
     menu: [course("Six courses", "French, seasonal")],
     inclusions: ["Six courses", "Glass of crémant", "Occasion card"],
     host: "claire-dubois", venue: "east-village-room", priceDollars: 140, durationMinutes: 150, capacity: 16, policy: "STRICT_7D",
-    photos: ["dessert", "wine", "restaurantInterior"], featured: true, weekdays: [5, 6], hour: 19, fill: "busy", popularity: 1.3,
+    photos: ["dessert", "wine", "heroTable"], featured: true, weekdays: [5, 6], hour: 19, fill: "busy", popularity: 1.3,
   },
 ];
 
@@ -423,6 +423,16 @@ export const POLICIES = [
     fullRefundHours: 168,
     partialRefundHours: 48,
     partialRefundPercent: 50,
+  },
+  {
+    // Tastable's standard terms for new bookings (see src/lib/booking/cancellation.ts).
+    key: "LATE_FEE_24H_25",
+    name: "Tastable standard (24 hours)",
+    summary: "Free cancellation until 24 hours before the start. Cancellations made less than 24 hours before the event are subject to a fee of 25% of the ticket subtotal.",
+    fullRefundHours: 24,
+    partialRefundHours: null,
+    partialRefundPercent: 0,
+    lateFeePercent: 25,
   },
 ] as const;
 

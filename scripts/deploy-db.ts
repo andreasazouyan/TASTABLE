@@ -1,7 +1,8 @@
 /**
  * Runs during the hosted build (see "vercel-build" in package.json):
  *   1. applies pending migrations, then
- *   2. seeds the FICTIONAL demo data only if the database is empty, or when TASTABLE_RESEED=true.
+ *   2. seeds the FICTIONAL demo data only if the database is empty, or when TASTABLE_RESEED=true,
+ *      otherwise adds Regina's Nov 23 demo event if it's missing (or updates its date, title and copy).
  * Bookings made on the live demo therefore survive ordinary redeploys.
  */
 import "dotenv/config";
@@ -10,6 +11,7 @@ import { execSync } from "node:child_process";
 import { Client } from "pg";
 
 import { DATABASE_URL_NAMES, directDatabaseUrl } from "../src/lib/database-url";
+import { applyEventImages } from "./apply-event-images";
 
 async function main() {
   const migrateUrl = directDatabaseUrl();
@@ -35,6 +37,11 @@ async function main() {
     execSync("npx tsx prisma/seed.ts", { stdio: "inherit", env: { ...process.env, DATABASE_URL: migrateUrl } });
   } else {
     console.log(`Demo data already present (${rows[0].n} experiences); skipping seed.`);
+    // Additive only: put Tastable's event images in front of the sample events' photos.
+    const added = await applyEventImages(migrateUrl);
+    console.log(`Event images: ${added} image(s) added.`);
+    // Additive only: add Regina's Nov 23 demo event if this database predates it, else update its date and copy.
+    execSync("npx tsx scripts/reginas-table.ts add", { stdio: "inherit", env: { ...process.env, DATABASE_URL: migrateUrl } });
   }
 }
 

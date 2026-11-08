@@ -1,9 +1,9 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import { availability, seatsLeft } from "@/lib/booking/capacity";
-import { bookingReference, ticketCode } from "@/lib/booking/codes";
+import { bookingReference, simulatedPaymentReference, ticketCode } from "@/lib/booking/codes";
 import { simulateCharge } from "@/lib/booking/payment";
 import { quote, sessionUnitPrice } from "@/lib/booking/pricing";
-import { computeRefund, policySnapshot, type RefundQuote } from "@/lib/booking/refunds";
+import { LATE_FEE_POLICY_KEY, quoteCancellation, reminderTime, termsFromPolicy, termsFromSnapshot, termsSnapshot, type CancellationQuote } from "@/lib/booking/cancellation";
 import { DomainError } from "@/server/services/errors";
 
 type Db = PrismaClient;
@@ -15,8 +15,10 @@ export type CreateBookingInput = {
   contactName: string;
   contactEmail: string;
   dietaryRequirements?: string | null;
-  attendees?: { name?: string | null; dietaryNotes?: string | null }[];
+  attendees?: { name?: string | null; dietaryNotes?: string | null; mealChoice?: string | null }[];
   acknowledgedPolicy: boolean;
+  /** Reject a second active booking by the same guest for the session (e.g. a guest list event). */
+  onePerGuest?: boolean;
 };
 
 /**
@@ -56,10 +58,21 @@ export async function createBooking(db: Db, input: CreateBookingInput, now: Date
       );
     }
 
-    const charge = simulateCharge(price.totalCents);
+    // Checked after the seat UPDATE: its row lock serialises concurrent requests for this session,
+    // so a double submission sees the first booking once it commits, and this rollback frees the seats.
+    if (input.onePerGuest) {
+      const existing = await tx.booking.count({ where: { sessionId: session.id, guestId: input.guestId, status: { in: ["CONFIRMED", "PENDING"] } } });
+      if (existing > 0) throw new DomainError("You're already on the guest list for this event.", "CONFLICT");
+    }
+
+    // Complimentary events ($0) need no simulated charge, only a reference for the record.
+    const charge = price.totalCents === 0 ? { ok: true as const, reference: simulatedPaymentReference() } : simulateCharge(price.totalCents);
     if (!charge.ok) throw new DomainError(`Simulated payment failed: ${charge.reason}`, "PAYMENT_FAILED");
 
-    const policy = session.experience.cancellationPolicy;
+    // New bookings accept Tastable's standard late-fee terms; the accepted terms are stored on the
+    // booking so later policy changes never alter it.
+    const policy = await tx.cancellationPolicy.findFirst({ where: { hostId: null, key: LATE_FEE_POLICY_KEY } });
+    if (!policy) throw new DomainError("Booking is temporarily unavailable: cancellation terms are missing.", "CONFLICT");
     const attendees = input.attendees ?? [];
     const booking = await tx.booking.create({
       data: {
@@ -77,7 +90,9 @@ export async function createBooking(db: Db, input: CreateBookingInput, now: Date
         contactEmail: input.contactEmail,
         dietaryRequirements: input.dietaryRequirements || null,
         policyAcknowledgedAt: now,
-        policySnapshot: policySnapshot(policy),
+        policySnapshot: termsSnapshot(termsFromPolicy(policy)),
+        cancellationPolicyId: policy.id,
+        cancellationPolicyVersion: policy.version,
         paymentStatus: "SIMULATED_PAID",
         paymentReference: charge.reference,
         isFictional: false,
@@ -87,11 +102,15 @@ export async function createBooking(db: Db, input: CreateBookingInput, now: Date
             code: ticketCode(),
             attendeeName: i === 0 ? input.contactName : attendees[i]?.name || null,
             dietaryNotes: attendees[i]?.dietaryNotes || null,
+            mealChoice: attendees[i]?.mealChoice || null,
           })),
         },
       },
       include: { tickets: true },
     });
+
+    // In-app reminder 24 hours before (shown inside Tastable; no email or push is sent).
+    await tx.bookingReminder.create({ data: { bookingId: booking.id, remindAt: reminderTime(session.startsAt), createdAt: now } });
 
     // If the guest was waitlisted for this session, mark the entry converted.
     await tx.waitlistEntry.updateMany({
@@ -103,7 +122,7 @@ export async function createBooking(db: Db, input: CreateBookingInput, now: Date
   });
 }
 
-export type CancellationPreview = RefundQuote & { alreadyCancelled: boolean; releasesSeats: boolean };
+export type CancellationPreview = CancellationQuote & { alreadyCancelled: boolean; releasesSeats: boolean };
 
 async function loadForCancellation(db: Db | Parameters<Parameters<Db["$transaction"]>[0]>[0], bookingId: string) {
   return db.booking.findUnique({
@@ -112,13 +131,17 @@ async function loadForCancellation(db: Db | Parameters<Parameters<Db["$transacti
   });
 }
 
-/** The exact refund the guest would receive if they cancelled at `now`. */
+/** The terms a booking was made under (its stored snapshot), never the event's current policy. */
+export function bookingTerms(booking: NonNullable<Awaited<ReturnType<typeof loadForCancellation>>>) {
+  return termsFromSnapshot(booking.policySnapshot, booking.session.experience.cancellationPolicy);
+}
+
+/** The exact fee and refund the guest would get if they cancelled at `now`. */
 export async function previewCancellation(db: Db, bookingId: string, guestId: string, now: Date): Promise<CancellationPreview> {
   const booking = await loadForCancellation(db, bookingId);
   if (!booking || booking.guestId !== guestId) throw new DomainError("Booking not found.", "NOT_FOUND");
-  const refund = computeRefund(booking, booking.session.experience.cancellationPolicy, booking.session.startsAt, now);
   return {
-    ...refund,
+    ...quoteCancellation(booking, bookingTerms(booking), booking.session.startsAt, now),
     alreadyCancelled: booking.status === "CANCELLED",
     releasesSeats: booking.session.startsAt > now,
   };
@@ -148,13 +171,10 @@ export async function cancelBooking(
       throw new DomainError("This booking can no longer be cancelled.", "CONFLICT");
     }
 
-    const refund = computeRefund(
-      booking,
-      booking.session.experience.cancellationPolicy,
-      booking.session.startsAt,
-      now,
-      args.actor === "GUEST" ? "GUEST" : "HOST",
-    );
+    // Quoted from the terms stored with the booking. The fee is kept from what was already paid
+    // and the rest refunded, so a fee is never charged on top.
+    const q = quoteCancellation(booking, bookingTerms(booking), booking.session.startsAt, now, args.actor);
+    if (!q.allowed) throw new DomainError(q.explanation, "CONFLICT");
 
     const transitioned = await tx.booking.updateMany({
       where: { id: booking.id, status: booking.status },
@@ -163,13 +183,10 @@ export async function cancelBooking(
         cancelledAt: now,
         cancelledBy: args.actor,
         cancellationReason: args.reason ?? null,
-        refundAmountCents: refund.refundCents,
-        paymentStatus:
-          refund.refundCents === 0
-            ? "SIMULATED_PAID"
-            : refund.refundCents >= booking.subtotalCents
-              ? "SIMULATED_REFUNDED"
-              : "SIMULATED_PARTIALLY_REFUNDED",
+        refundAmountCents: q.refundCents,
+        cancellationFeeCents: q.feeCents,
+        cancellationFeePercent: q.feePercent,
+        paymentStatus: q.refundCents === 0 ? "SIMULATED_PAID" : q.feeCents === 0 ? "SIMULATED_REFUNDED" : "SIMULATED_PARTIALLY_REFUNDED",
       },
     });
     if (transitioned.count !== 1) {
@@ -178,6 +195,7 @@ export async function cancelBooking(
     }
 
     await tx.bookingTicket.updateMany({ where: { bookingId: booking.id }, data: { status: "CANCELLED" } });
+    await tx.bookingReminder.updateMany({ where: { bookingId: booking.id, status: "SCHEDULED" }, data: { status: "CANCELLED" } });
 
     // Release seats only for sessions that have not started yet.
     if (booking.session.startsAt > now) {
@@ -194,7 +212,7 @@ export async function cancelBooking(
     }
 
     const updated = await tx.booking.findUniqueOrThrow({ where: { id: booking.id } });
-    return { booking: updated, refundCents: refund.refundCents, alreadyCancelled: false as const };
+    return { booking: updated, refundCents: q.refundCents, feeCents: q.feeCents, alreadyCancelled: false as const };
   });
 }
 
