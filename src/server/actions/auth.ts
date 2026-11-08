@@ -9,6 +9,9 @@ import { dummyHash, hashPassword, verifyPassword } from "@/lib/auth/password";
 import { db } from "@/lib/db";
 import { logInInput, safeNextPath, signUpInput } from "@/lib/validation/account";
 
+/** Demo persona who hasn't set preferences yet (see src/lib/domain/personas.ts). */
+const FRESH_PERSONA_ID = "usr_alex";
+
 export type AuthFormState = { message?: string; fieldErrors?: Record<string, string[] | undefined>; email?: string; name?: string } | null;
 
 /** Where a guest lands after signing in: the page they came from, else onboarding until it's done or skipped. */
@@ -90,6 +93,18 @@ export async function signInAs(formData: FormData) {
   if (!user) redirect("/sign-in?error=unknown");
 
   await startSession(user.id);
+
+  // The "just moved to New York" persona always starts from a blank slate, so every visitor of the
+  // shared demo can walk through onboarding (otherwise the first person to finish it would hide it).
+  if (user.id === FRESH_PERSONA_ID && user.role !== "HOST" && !parsed.data.next && user.guestProfile) {
+    const guestProfileId = user.guestProfile.id;
+    await db.$transaction([
+      db.guestPreferences.deleteMany({ where: { guestProfileId } }),
+      db.guestPreferences.create({ data: { guestProfileId } }),
+    ]);
+    redirect("/onboarding");
+  }
+
   redirect(guestLanding(user, parsed.data.next));
 }
 

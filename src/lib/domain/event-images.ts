@@ -101,8 +101,20 @@ export function eventImageFor(slug: string) {
 }
 
 /** All of an event's own images in display order: cover first, then detail images. */
-export function eventImagesFor(slug: string) {
+/**
+ * Off: Andréas prefers professional placeholder photography (Unsplash, see photos.ts) over these
+ * uploaded images for now. The mapping is kept so they can be switched back on in one place.
+ */
+export const USE_TASTABLE_EVENT_IMAGES = false;
+
+/** The uploaded images mapped to an event, regardless of the switch above. */
+export function mappedEventImages(slug: string) {
   return [...(EVENT_IMAGES[slug] ? [EVENT_IMAGES[slug]] : []), ...(EVENT_DETAIL_IMAGES[slug] ?? [])].map(toPhoto);
+}
+
+/** Uploaded images to show for an event: none while USE_TASTABLE_EVENT_IMAGES is off. */
+export function eventImagesFor(slug: string) {
+  return USE_TASTABLE_EVENT_IMAGES ? mappedEventImages(slug) : [];
 }
 
 /** Every event-specific image file referenced above (for checks). */

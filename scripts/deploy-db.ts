@@ -19,7 +19,7 @@ import { applyEventImages } from "./apply-event-images";
  * features that add seed data). A database seeded with another version is wiped and re-seeded once;
  * otherwise ordinary redeploys keep bookings made on the live demo.
  */
-const SEED_VERSION = "2026-11-08-all-features";
+const SEED_VERSION = "2026-11-08-unsplash-photos";
 
 async function main() {
   const migrateUrl = directDatabaseUrl();

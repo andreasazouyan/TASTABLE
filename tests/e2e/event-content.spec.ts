@@ -45,30 +45,12 @@ test("event pages show the structured menu by category, dietary labels and the i
   await expect(page.getByRole("region", { name: "The Menu" }).getByText("Seasonal tasting menu")).toHaveCount(0);
 });
 
-test("Tastable's event images load on cards and detail pages, on desktop and mobile", async ({ page, request }) => {
-  const { ALL_EVENT_IMAGE_FILES, EVENT_IMAGE_DIR } = await import("../../src/lib/domain/event-images");
-  for (const file of ALL_EVENT_IMAGE_FILES) {
-    const res = await request.get(`${EVENT_IMAGE_DIR}/${file}`);
-    expect(res.status(), file).toBe(200);
-  }
-  for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
-    await page.setViewportSize(viewport);
-    await page.goto("/discover");
-    const card = page.getByRole("article").filter({ has: page.getByRole("link", { name: "Italian Pasta-Making Workshop" }) });
-    const cover = card.getByRole("img", { name: "Hands lifting fresh pasta from a floured board" }).first();
-    await card.first().scrollIntoViewIfNeeded().catch(() => {});
-    await expect(cover).toBeAttached();
-    await expect.poll(() => cover.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
-    expect(await cover.evaluate((img: HTMLImageElement) => getComputedStyle(img).objectFit)).toBe("cover");
-
-    // Second batch: the taco pop-up's own cover, and detail images in the gallery.
-    const taco = page.getByRole("article").filter({ has: page.getByRole("link", { name: "One-Night Taco Pop-Up" }) }).getByRole("img", { name: /Three tacos with lime/ }).first();
-    await expect(taco).toBeAttached();
-
-    await page.goto("/experiences/italian-pasta-making-workshop");
-    if (viewport.width > 640) await expect(page.getByRole("img", { name: "Guests cooking together around a kitchen counter" }).first()).toBeVisible();
-    const hero = page.getByRole("img", { name: "Hands lifting fresh pasta from a floured board" }).first();
-    await expect(hero).toBeVisible();
-    await expect.poll(() => hero.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
-  }
+test("events use placeholder photography (Unsplash), not the uploaded event images", async ({ page }) => {
+  await page.goto("/discover");
+  const card = page.getByRole("article").filter({ has: page.getByRole("link", { name: "Italian Pasta-Making Workshop" }) });
+  const cover = card.getByRole("img").first();
+  await expect(cover).toBeAttached();
+  const src = decodeURIComponent((await cover.getAttribute("src")) ?? "");
+  expect(src).toContain("images.unsplash.com");
+  expect(src).not.toContain("tastable-event-images");
 });
