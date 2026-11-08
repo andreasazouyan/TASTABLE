@@ -6,6 +6,7 @@ import { CreditCard, Minus, Plus, ShieldCheck, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { clampPartySize, partySizeRange } from "@/lib/booking/party-size";
 import { MAX_TICKETS_PER_BOOKING, quote } from "@/lib/booking/pricing";
 import { formatMoney } from "@/lib/format";
 import { CHECKOUT_POLICY_NOTICE, LATE_FEE_PERCENT, lateFeeCents } from "@/lib/booking/cancellation";
@@ -16,6 +17,8 @@ type Props = {
   sessionId: string;
   unitPriceCents: number;
   seatsLeft: number;
+  /** Quantity picked on the event page (raw URL value; clamped here). */
+  initialSeats?: string;
   policyName: string;
   policyLines: string[];
   defaultName: string;
@@ -46,7 +49,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
  */
 export function CheckoutForm(p: Props) {
   const max = Math.min(MAX_TICKETS_PER_BOOKING, p.seatsLeft);
-  const [tickets, setTickets] = useState(Math.min(1, max));
+  const [tickets, setTickets] = useState(() => Math.min(max, clampPartySize(p.initialSeats, partySizeRange(p.seatsLeft))));
   const [state, action, pending] = useActionState<CheckoutState, FormData>(checkoutAction, null);
   // Controlled so a guest's ticks survive a server-side validation error (React resets uncontrolled forms).
   const [ackPolicy, setAckPolicy] = useState(false);
@@ -65,7 +68,7 @@ export function CheckoutForm(p: Props) {
             <div>
               <p className="font-medium">General admission</p>
               <p className="text-sm text-muted-foreground">
-                {formatMoney(p.unitPriceCents)} each · {p.seatsLeft} {p.seatsLeft === 1 ? "seat" : "seats"} left
+                {formatMoney(p.unitPriceCents)} per seat · {p.seatsLeft} {p.seatsLeft === 1 ? "seat" : "seats"} left
               </p>
             </div>
             <div className="flex items-center gap-2" role="group" aria-label="Ticket quantity">

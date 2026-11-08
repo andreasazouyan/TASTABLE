@@ -28,7 +28,7 @@ test("guest: discover, filter, book two tickets, see ticket and calendar, cancel
   await page.locator("article a").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByText(/Cancellation policy/i).first()).toBeVisible();
-  await page.getByRole("link", { name: "Book now" }).first().click();
+  await page.getByRole("link", { name: /^Reserve \d+ seats?$/ }).first().click();
   await expect(page.getByText(/Demo payment · nothing will be charged/)).toBeVisible();
   await expect(page.locator('input[autocomplete="cc-number"]')).toHaveCount(0);
 
