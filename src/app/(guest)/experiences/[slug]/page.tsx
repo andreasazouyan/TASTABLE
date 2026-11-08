@@ -5,6 +5,8 @@ import { BadgeCheck, CalendarClock, Check, Clock, KeyRound, Leaf, MapPin, Shield
 
 import { FollowButton } from "@/components/experiences/follow-button";
 import { EventMenu, menuHeading, type MenuView } from "@/components/experiences/event-menu";
+import { CollapsibleSection } from "@/components/experiences/collapsible-section";
+import { MobileReserveBar } from "@/components/experiences/mobile-reserve-bar";
 import { ExperienceTimeline } from "@/components/experiences/experience-timeline";
 import { HostRating } from "@/components/experiences/host-rating";
 import { sectionsFromLegacyMenu } from "@/lib/domain/event-content";
@@ -39,16 +41,6 @@ export default function ExperiencePage(props: PageProps<"/experiences/[slug]">) 
   );
 }
 
-function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
-  return (
-    <section className="border-t py-8 first:border-t-0 first:pt-0" aria-labelledby={id}>
-      <h2 id={id} className="mb-4 text-2xl">
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
 
 async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">) {
   const { slug } = await params;
@@ -106,6 +98,17 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
   const timelineSession = upcoming.find((x) => x.id === sessionParam && x.status !== "CANCELLED") ?? upcoming.find((x) => x.status !== "CANCELLED");
   const path = `/experiences/${exp.slug}`;
   const photos = exp.photos.length ? exp.photos : [{ id: "none", url: "", alt: exp.title }];
+  // Phone sticky bar: same wording as the booking card it leads to.
+  const openDates = pickerSessions.filter((s) => s.availability === "AVAILABLE" || s.availability === "LIMITED").length;
+  const anyOpen = openDates > 0;
+  const anySoldOut = pickerSessions.some((s) => s.availability === "SOLD_OUT");
+  const reserveBarLabel = reginaReservation
+    ? "See your reservation"
+    : anyOpen
+      ? "Reserve your spot"
+      : anySoldOut
+        ? "Join the waitlist"
+        : null;
 
   return (
     <article className="container-page pt-6 sm:pt-10">
@@ -174,9 +177,9 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
         </p>
       )}
 
-      <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_24rem]">
+      <div className="mt-8 grid gap-8 lg:mt-10 lg:grid-cols-[1fr_24rem] lg:gap-12">
         <div>
-          <Section title="Why it's worth it" id="usp">
+          <CollapsibleSection title="Why it's worth it" id="usp" defaultOpen>
             <ul className="grid gap-3 sm:grid-cols-3">
               {highlights.map((h) => (
                 <li key={h} className="flex gap-3 rounded-xl bg-card p-4 shadow-soft">
@@ -186,19 +189,19 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
               ))}
             </ul>
             <p className="mt-6 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">{exp.description}</p>
-          </Section>
+          </CollapsibleSection>
 
-          <Section title={menuHeading(exp.category)} id="menu">
+          <CollapsibleSection title={menuHeading(exp.category)} id="menu">
             <EventMenu menu={menuView} />
-          </Section>
+          </CollapsibleSection>
 
           {exp.itinerary.length > 0 && (
-            <Section title="Your Experience" id="itinerary">
+            <CollapsibleSection title="Your Experience" id="itinerary">
               <ExperienceTimeline steps={exp.itinerary} startsAt={timelineSession?.startsAt ?? null} />
-            </Section>
+            </CollapsibleSection>
           )}
 
-          <Section title="What's included" id="included">
+          <CollapsibleSection title="What's included" id="included">
             <ul className="grid gap-2 sm:grid-cols-2">
               {inclusions.map((x) => (
                 <li key={x} className="flex items-center gap-2 text-sm">
@@ -206,9 +209,9 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </li>
               ))}
             </ul>
-          </Section>
+          </CollapsibleSection>
 
-          <Section title="Good to know" id="good-to-know">
+          <CollapsibleSection title="Good to know" id="good-to-know">
             <dl className="grid gap-6 sm:grid-cols-2">
               <div>
                 <dt className="mb-1.5 flex items-center gap-2 font-medium">
@@ -243,9 +246,9 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </dd>
               </div>
             </dl>
-          </Section>
+          </CollapsibleSection>
 
-          <Section title="The venue" id="venue">
+          <CollapsibleSection title="The venue" id="venue">
             <div className="rounded-2xl border bg-card p-5">
               <p className="font-display text-lg">{exp.venue.isSecretLocation ? "Secret location" : exp.venue.name}</p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -265,9 +268,9 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
               )}
               {exp.venue.accessibilityNotes && <p className="mt-2 text-sm text-muted-foreground">Access: {exp.venue.accessibilityNotes}</p>}
             </div>
-          </Section>
+          </CollapsibleSection>
 
-          <Section title="Your host" id="host">
+          <CollapsibleSection title="Your host" id="host">
             <div className="flex flex-col gap-5 sm:flex-row">
               <Link href={`/hosts/${exp.host.slug}`} aria-hidden tabIndex={-1} className="shrink-0">
                 {exp.host.profilePhotoUrl ? (
@@ -304,9 +307,9 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 )}
               </div>
             </div>
-          </Section>
+          </CollapsibleSection>
 
-          <Section title="Reviews" id="reviews">
+          <CollapsibleSection title="Reviews" id="reviews">
             <ReviewSummary rating={eventRating} aspects={eventAspects} />
             {eventReviews.length > 1 && (
               <div className="mt-5 flex justify-end">
@@ -319,9 +322,9 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 All reviews for {exp.host.displayName}
               </Link>
             </p>
-          </Section>
+          </CollapsibleSection>
 
-          <Section title="Cancellation policy" id="policy">
+          <CollapsibleSection title="Cancellation policy" id="policy">
             {/* New bookings use Tastable's standard terms; earlier bookings keep the terms they accepted. */}
             <p className="mb-3 font-medium">{STANDARD_LATE_FEE_TERMS.name}</p>
             <ul className="space-y-1.5 text-sm text-muted-foreground">
@@ -330,11 +333,11 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
               ))}
             </ul>
             <p className="mt-3 text-xs text-muted-foreground">You&apos;ll see the exact fee and refund before confirming any cancellation.</p>
-          </Section>
+          </CollapsibleSection>
         </div>
 
         <aside aria-label="Book this experience" className="lg:relative">
-          <div className="rounded-2xl border bg-card p-5 shadow-lift lg:sticky lg:top-24 sm:p-6">
+          <div id="book" className="scroll-mt-24 rounded-2xl border bg-card p-5 shadow-lift lg:sticky lg:top-24 sm:p-6">
             {regina ? (
               <div className="mb-5">
                 <p>
@@ -369,6 +372,15 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
           {regina && demoToolsEnabled() && <ReginaResetPanel className="mt-4" />}
         </aside>
       </div>
+      {reserveBarLabel && (
+        <MobileReserveBar
+          targetId="book"
+          label={reserveBarLabel}
+          priceLabel={regina ? "Free" : formatPrice(fromPrice)}
+          priceSuffix={regina ? undefined : "/ person"}
+          note={regina ? `Up to ${REGINA_MAX_SEATS} seats per booking` : openDates > 1 ? `${openDates} dates available` : undefined}
+        />
+      )}
     </article>
   );
 }
