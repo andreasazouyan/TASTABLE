@@ -3,11 +3,11 @@ import { expect, test, signInAs } from "./helpers";
 test("guest: discover, filter, book two tickets, see ticket and calendar, cancel with refund", async ({ page, request }) => {
   await signInAs(page, /Jordan .*demo guest/);
 
-  // Home: hero, the four categories, collections.
+  // Home: search, the four categories, carousels.
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Discover experiences worth sharing");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("What are you in the mood for?");
   for (const c of ["Supper Clubs & Private Dining", "Cooking Classes & Workshops", "Pop-Ups & Exclusive Experiences", "Social Culinary Experiences"]) {
-    await expect(page.getByText(c).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: new RegExp(`^${c.replace("&", "&")}: \\d+ available`) })).toBeVisible();
   }
 
   // Discover: filters live in the URL and survive reloads.

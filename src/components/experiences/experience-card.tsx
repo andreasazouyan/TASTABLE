@@ -27,6 +27,7 @@ export function ExperienceCard({
   saved = false,
   reason,
   priority = false,
+  badge,
   className,
   basePath = "/experiences",
   showSave = true,
@@ -37,6 +38,8 @@ export function ExperienceCard({
   /** Optional explanation, e.g. for "Recommended for You". */
   reason?: string;
   priority?: boolean;
+  /** Small label on the photo, e.g. "Featured" on Home. */
+  badge?: string;
   className?: string;
   /** Where the card links to; the host Explore tab uses /host/explore so hosts stay in their account. */
   basePath?: string;
@@ -63,7 +66,14 @@ export function ExperienceCard({
           imageClassName="group-hover:scale-[1.03]"
         />
         <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5">{listing.isFictional && <SampleBadge />}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {badge && (
+              <span className="inline-flex items-center rounded-full bg-foreground/90 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-background shadow-soft backdrop-blur">
+                {badge}
+              </span>
+            )}
+            {listing.isFictional && <SampleBadge />}
+          </div>
         </div>
         {showSave && (
           <SaveButton experienceId={listing.id} saved={saved} saveCount={listing.saves ?? 0} title={listing.title} className="absolute top-3 right-3 z-10" />
