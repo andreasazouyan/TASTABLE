@@ -27,6 +27,9 @@ import { formatCompact, formatDate, formatDuration, formatPrice, formatTime } fr
 import { requestNow } from "@/lib/request-clock";
 import { db } from "@/lib/db";
 import { getExperienceDetail } from "@/server/queries/listings";
+import { ReginaResetPanel } from "@/components/booking/regina-reset-panel";
+import { demoToolsEnabled, isReginasTable, REGINA_BOOK_LABEL, REGINA_HOSTED_BY, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
+import { findReginaReservation } from "@/server/services/reginas-table";
 
 export default function ExperiencePage(props: PageProps<"/experiences/[slug]">) {
   return (
@@ -69,6 +72,9 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
     getPublicReviews({ experienceId: exp.id }, reviewSort, 20, guestId),
   ]);
   const waitlistedIds = new Set(waitlisted.map((w) => w.sessionId));
+  // Regina's event: free (1 seat up to the seats left), with its own guest list.
+  const regina = isReginasTable(exp.slug);
+  const reginaReservation = regina && guestId ? await findReginaReservation(db, guestId) : null;
   const following = (user?.guestProfile?.preferences?.followedHosts ?? "").split(",").includes(exp.host.slug);
 
   const category = getCategory(exp.category);
@@ -125,6 +131,11 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
             {exp.isFictional && <SampleBadge variant="outline" />}
           </div>
           <h1 className="text-4xl leading-[1.05] sm:text-5xl">{exp.title}</h1>
+          {regina && (
+            <p className="mt-2 text-base font-medium text-accent-foreground" data-testid="hosted-by">
+              {REGINA_HOSTED_BY}
+            </p>
+          )}
           <p className="mt-3 text-lg text-muted-foreground">{exp.summary}</p>
           <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1.5">
@@ -156,7 +167,11 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
           />
         ))}
       </div>
-      {photos.length > 1 && <p className="mt-2 text-xs text-muted-foreground">Illustrative photography. Photos do not depict this fictional host or event.</p>}
+      {photos.length > 1 && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {exp.isFictional ? "Illustrative photography. Photos do not depict this fictional host or event." : "Illustrative photography."}
+        </p>
+      )}
 
       <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_24rem]">
         <div>
@@ -169,7 +184,7 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
                 </li>
               ))}
             </ul>
-            <p className="mt-6 text-[15px] leading-relaxed text-foreground/85">{exp.description}</p>
+            <p className="mt-6 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">{exp.description}</p>
           </Section>
 
           <Section title={menuHeading(exp.category)} id="menu">
@@ -233,14 +248,19 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
             <div className="rounded-2xl border bg-card p-5">
               <p className="font-display text-lg">{exp.venue.isSecretLocation ? "Secret location" : exp.venue.name}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {exp.venue.neighborhood}, {exp.venue.borough} · {exp.venue.type.replaceAll("_", " ").toLowerCase()}
+                {exp.venue.neighborhood}, {exp.venue.borough}
+                {exp.venue.isFictional && ` · ${exp.venue.type.replaceAll("_", " ").toLowerCase()}`}
               </p>
               {exp.venue.isSecretLocation ? (
                 <p className="mt-3 flex items-start gap-2 text-sm">
                   <KeyRound className="mt-0.5 size-4 text-brand" aria-hidden /> The exact address is shared with ticket holders 24 hours before.
                 </p>
-              ) : (
+              ) : exp.venue.isFictional ? (
                 <p className="mt-3 text-sm">Address shown on your ticket after booking.</p>
+              ) : (
+                <p className="mt-3 flex items-start gap-2 text-sm">
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden /> {exp.venue.addressLine}
+                </p>
               )}
               {exp.venue.accessibilityNotes && <p className="mt-2 text-sm text-muted-foreground">Access: {exp.venue.accessibilityNotes}</p>}
             </div>
@@ -314,13 +334,38 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
 
         <aside aria-label="Book this experience" className="lg:relative">
           <div className="rounded-2xl border bg-card p-5 shadow-lift lg:sticky lg:top-24 sm:p-6">
-            <p className="mb-5">
-              <span className="text-sm text-muted-foreground">From </span>
-              <span className="font-display text-3xl">{formatPrice(fromPrice)}</span>
-              <span className="text-sm text-muted-foreground"> / person</span>
-            </p>
-            <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} />
+            {regina ? (
+              <div className="mb-5">
+                <p>
+                  <span className="font-display text-3xl">{formatPrice(fromPrice)}</span>
+                  <span className="text-sm text-muted-foreground"> / guest</span>
+                </p>
+                <p className="mt-1 text-sm font-medium text-accent-foreground" data-testid="price-note">
+                  {REGINA_PRICE_NOTE}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">One-time only</p>
+              </div>
+            ) : (
+              <p className="mb-5">
+                <span className="text-sm text-muted-foreground">From </span>
+                <span className="font-display text-3xl">{formatPrice(fromPrice)}</span>
+                <span className="text-sm text-muted-foreground"> / person</span>
+              </p>
+            )}
+            {reginaReservation ? (
+              <div className="rounded-xl bg-[#e5eddc] p-4 text-sm text-[#2f3d24]" role="status">
+                <p className="font-medium">You&apos;re on the guest list.</p>
+                <Link href={`/bookings/${reginaReservation.reference}`} className="mt-1 inline-block font-medium underline underline-offset-4">
+                  See your reservation
+                </Link>
+              </div>
+            ) : regina ? (
+              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} bookLabel={REGINA_BOOK_LABEL} seatNoun="seat" />
+            ) : (
+              <SessionPicker slug={exp.slug} sessions={pickerSessions} initialId={sessionParam} path={path} />
+            )}
           </div>
+          {regina && demoToolsEnabled() && <ReginaResetPanel className="mt-4" />}
         </aside>
       </div>
     </article>

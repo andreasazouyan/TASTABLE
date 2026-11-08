@@ -18,6 +18,11 @@ export function BookedDialog(p: {
   policyNotice: string | null;
   feeSentence: string | null;
   icsHref: string;
+  /** Optional overrides, e.g. Regina's event: "You're on the guest list!" with venue and meal choices. */
+  heading?: string;
+  ticketsTitle?: string;
+  totalTitle?: string;
+  extraRows?: { label: string; value: string }[];
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -38,7 +43,7 @@ export function BookedDialog(p: {
       <div className="p-6 sm:p-7">
         <CircleCheck className="size-8 text-brand" aria-hidden />
         <h2 id="booked-title" className="mt-3 text-3xl">
-          You&apos;re booked!
+          {p.heading ?? "You're booked!"}
         </h2>
         <p className="mt-1 font-display text-xl">{p.title}</p>
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -51,13 +56,19 @@ export function BookedDialog(p: {
             <dd>{p.timeLabel}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Tickets</dt>
+            <dt className="text-muted-foreground">{p.ticketsTitle ?? "Tickets"}</dt>
             <dd>{p.tickets}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Total (simulated)</dt>
+            <dt className="text-muted-foreground">{p.totalTitle ?? "Total (simulated)"}</dt>
             <dd>{p.totalLabel}</dd>
           </div>
+          {p.extraRows?.map((r) => (
+            <div key={r.label} className="col-span-2">
+              <dt className="text-muted-foreground">{r.label}</dt>
+              <dd>{r.value}</dd>
+            </div>
+          ))}
         </dl>
         {p.policyNotice && (
           <div className="mt-5 rounded-xl border border-brand/40 bg-brand-soft/50 p-4 text-sm">

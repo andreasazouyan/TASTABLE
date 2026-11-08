@@ -39,6 +39,10 @@ const IMG = {
   walkingTour: { file: "social-walking-tour.jpg", alt: "A group walking past market stalls on a city street" },
   studio: { file: "studio-kitchen.jpg", alt: "A bright studio kitchen with an island and stools" },
   brunch: { file: "west-african-sunday-brunch.jpg", alt: "Stew, rice and fried plantains on a brunch table" },
+  // Regina's Table (caption-free versions of first-batch images)
+  reginaCover: { file: "reginas-table-supper-club.jpg", alt: "Guests laughing together over dinner at a warm, candlelit table" },
+  reginaPasta: { file: "reginas-table-homemade-pasta.jpg", alt: "Fresh homemade pasta lifted from a floured board" },
+  reginaSalad: { file: "reginas-table-fresh-salad.jpg", alt: "Fresh tomatoes, greens and herbs being prepared" },
 } satisfies Record<string, EventImage>;
 
 /** Cover image per event (by slug). */
@@ -67,6 +71,7 @@ export const EVENT_IMAGES: Record<string, EventImage> = {
   // The greenhouse venue is a Greenpoint rooftop.
   "greenhouse-plant-based-supper": IMG.rooftop,
   "harlem-brunch-supper-club": IMG.brunch,
+  "reginas-table-supper-club": IMG.reginaCover,
 };
 
 /**
@@ -82,6 +87,7 @@ export const EVENT_DETAIL_IMAGES: Record<string, EventImage[]> = {
   "levantine-mezze-workshop": [IMG.handsOn],
   "greenmarket-cooking-class": [IMG.marketTour, IMG.handsOn],
   "spice-market-walk": [IMG.walkingTour],
+  "reginas-table-supper-club": [IMG.reginaPasta, IMG.reginaSalad],
 };
 
 /** Images in the folder with no close match among the current sample events (kept for future events). */
