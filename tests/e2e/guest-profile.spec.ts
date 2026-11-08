@@ -8,14 +8,15 @@ test("profile: edit neighborhood, time slots, cuisine and dish; changes persist 
   for (const h of ["My Preferences", "My Bookings", "Saved Experiences", "My Reviews"]) await expect(page.getByRole("heading", { name: h, level: 2 })).toBeVisible();
 
   // Current answers are loaded.
-  await expect(page.getByText("Selected: Williamsburg")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change neighborhood (currently Williamsburg)" })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /6:00–8:00 PM/ })).toBeChecked();
   await expect(page.getByRole("button", { name: "Remove Pasta" })).toBeVisible();
   const save = page.getByRole("button", { name: "Save Changes" });
   await expect(save).toBeDisabled();
 
   // Change neighborhood, a time slot, a cuisine and a favorite dish.
-  await page.getByText("East Village", { exact: true }).click();
+  await page.getByRole("button", { name: /Change neighborhood/ }).click();
+  await page.getByRole("button", { name: "East Village", exact: true }).click();
   await page.getByRole("checkbox", { name: /6:00–8:00 PM/ }).uncheck({ force: true });
   await page.getByText("12:00–2:00 PM", { exact: true }).click();
   await page.getByText("Mexican", { exact: true }).click();
@@ -27,7 +28,7 @@ test("profile: edit neighborhood, time slots, cuisine and dish; changes persist 
 
   // Persisted after refresh.
   await page.reload();
-  await expect(page.getByText("Selected: East Village")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change neighborhood (currently East Village)" })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /12:00–2:00 PM/ })).toBeChecked();
   await expect(page.getByRole("checkbox", { name: /6:00–8:00 PM/ })).not.toBeChecked();
   await expect(page.getByRole("checkbox", { name: "Mexican" })).toBeChecked();

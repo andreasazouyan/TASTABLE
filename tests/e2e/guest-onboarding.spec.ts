@@ -12,7 +12,19 @@ test("onboarding: six pages, back keeps selections, refresh resumes, saved answe
   await expect(page.getByText("Choose your neighborhood.")).toBeVisible();
   await page.getByRole("searchbox", { name: "Search neighborhoods" }).fill("green");
   await expect(page.getByText("West Village", { exact: true })).toBeHidden();
-  await page.getByText("Greenwich Village", { exact: true }).click();
+  // Travel time only appears once a neighborhood is picked; picking folds the list to the one choice.
+  await expect(page.getByText("30 minutes", { exact: true })).toBeHidden();
+  await page.getByRole("button", { name: "Greenwich Village", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Change neighborhood (currently Greenwich Village)" })).toBeFocused();
+  await expect(page.getByRole("searchbox", { name: "Search neighborhoods" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Chelsea", exact: true })).toBeHidden();
+  // Change reopens the list, picking again folds it back.
+  await page.getByRole("button", { name: /Change neighborhood/ }).click();
+  await expect(page.getByRole("searchbox", { name: "Search neighborhoods" })).toBeFocused();
+  await page.getByRole("button", { name: "Chelsea", exact: true }).click();
+  await page.getByRole("button", { name: /Change neighborhood/ }).click();
+  await page.getByRole("button", { name: "Greenwich Village", exact: true }).click();
+  await expect(page.getByText("Your neighborhood")).toBeVisible();
   await page.getByText("30 minutes", { exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -70,7 +82,7 @@ test("onboarding: six pages, back keeps selections, refresh resumes, saved answe
 
   // Saved answers come back exactly when revisiting.
   await page.goto("/onboarding?step=1");
-  await expect(page.getByText("Selected: Greenwich Village")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Change neighborhood (currently Greenwich Village)" })).toBeVisible();
   await expect(page.getByRole("radio", { name: "30 minutes" })).toBeChecked();
   await page.goto("/onboarding?step=2");
   await expect(page.getByRole("checkbox", { name: "Friday" })).toBeChecked();
