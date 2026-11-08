@@ -1,12 +1,11 @@
 import { z } from "zod";
 
-import { MAX_TICKETS_PER_BOOKING } from "@/lib/booking/pricing";
-import { REGINA_MAINS } from "@/lib/domain/reginas-table";
+import { REGINA_MAINS, REGINA_MAX_SEATS } from "@/lib/domain/reginas-table";
 
 const mainKey = z.enum(REGINA_MAINS.map((m) => m.key) as [string, ...string[]], { error: "Choose a main course" });
 
 /**
- * Regina's Entrepreneurship Class Supper reservation: 1 seat up to the seats left, each guest
+ * Regina's Entrepreneurship Class Supper reservation: 1 or 2 seats (you and a +1), each guest
  * with a main course. Guest 1 is the person reserving; other guests' names are optional.
  */
 export const reginaReservationSchema = z
@@ -14,9 +13,9 @@ export const reginaReservationSchema = z
     sessionId: z.string().min(1, "Choose a date"),
     contactName: z.string().trim().min(2, "Enter your name").max(80),
     contactEmail: z.email("Enter a valid email"),
-    ticketCount: z.coerce.number().int().min(1, "Reserve at least 1 seat").max(MAX_TICKETS_PER_BOOKING, `At most ${MAX_TICKETS_PER_BOOKING} seats per reservation`),
-    guestNames: z.array(z.string().trim().max(80)).max(MAX_TICKETS_PER_BOOKING).default([]),
-    mains: z.array(z.string().optional()).max(MAX_TICKETS_PER_BOOKING),
+    ticketCount: z.coerce.number().int().min(1, "Reserve at least 1 seat").max(REGINA_MAX_SEATS, `At most ${REGINA_MAX_SEATS} seats per reservation (you and a +1)`),
+    guestNames: z.array(z.string().trim().max(80)).max(REGINA_MAX_SEATS).default([]),
+    mains: z.array(z.string().optional()).max(REGINA_MAX_SEATS),
     dietaryRequirements: z.string().trim().max(500).optional().default(""),
   })
   .strict()
@@ -30,7 +29,7 @@ export type ReginaReservationInput = z.infer<typeof reginaReservationSchema>;
 
 export function reginaReservationFromFormData(fd: FormData) {
   const count = Number(fd.get("ticketCount"));
-  const n = Number.isInteger(count) && count > 0 ? Math.min(count, MAX_TICKETS_PER_BOOKING) : 0;
+  const n = Number.isInteger(count) && count > 0 ? Math.min(count, REGINA_MAX_SEATS) : 0;
   return reginaReservationSchema.safeParse({
     sessionId: fd.get("sessionId"),
     contactName: fd.get("contactName"),

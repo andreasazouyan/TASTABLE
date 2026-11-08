@@ -27,13 +27,15 @@ const seats = async () => {
 };
 
 describe("Regina's Entrepreneurship Class Supper demo event", () => {
-  it("is seeded once: one session on Nov 19 at 8:30 PM New York time, 15 seats, 6 left, $0", async () => {
+  it("is seeded once: one session on Mon Nov 23 at 8:30 PM New York time, 15 seats, 6 left, $0", async () => {
     const exp = await db.experience.findUniqueOrThrow({ where: { slug: REGINA_SLUG }, include: { sessions: true, venue: true, host: true, menuSections: { include: { items: true } }, itinerary: true } });
     expect(exp.title).toBe(REGINA_TITLE);
+    expect(exp.description).toMatch(/^Regina and the Tastable team are excited to invite you/);
+    expect(JSON.parse(exp.highlights)).toContain("Only 3 spots available — and you can bring a +1!");
     expect(await db.experience.count({ where: { title: exp.title } })).toBe(1);
     expect(exp.sessions).toHaveLength(1);
-    expect(exp.sessions[0].startsAt.toISOString()).toBe("2026-11-20T01:30:00.000Z");
-    expect(exp.sessions[0].endsAt.toISOString()).toBe("2026-11-20T04:00:00.000Z");
+    expect(exp.sessions[0].startsAt.toISOString()).toBe("2026-11-24T01:30:00.000Z");
+    expect(exp.sessions[0].endsAt.toISOString()).toBe("2026-11-24T04:00:00.000Z");
     expect(exp.ticketPriceCents).toBe(0);
     expect(exp.category).toBe("SUPPER_CLUB_PRIVATE_DINING");
     expect(exp.host.displayName).toBe("Regina");
@@ -48,7 +50,7 @@ describe("Regina's Entrepreneurship Class Supper demo event", () => {
     const ids = (await db.experience.findMany({ where: { status: "PUBLISHED" }, select: { id: true } })).map((x) => x.id);
     const listings = await getListingsByIds(ids, now);
     const found = (q: Record<string, string>) => applyFilters(listings, parseFilters(q), now).some((m) => m.slug === REGINA_SLUG);
-    expect(found({ date: "2026-11-19" })).toBe(true);
+    expect(found({ date: "2026-11-23" })).toBe(true);
     expect(found({ borough: "manhattan" })).toBe(true);
     expect(found({ neighborhood: "morningside-heights" })).toBe(true);
     expect(found({ category: "supper-clubs" })).toBe(true);
@@ -57,10 +59,10 @@ describe("Regina's Entrepreneurship Class Supper demo event", () => {
     const all = applyFilters(listings, parseFilters({}), now);
     const i = all.findIndex((m) => m.slug === REGINA_SLUG);
     expect(all.slice(0, i).every((m) => m.matched!.startsAt <= all[i].matched!.startsAt)).toBe(true);
-    expect(isoDateNY(all[i].matched!.startsAt)).toBe("2026-11-19");
+    expect(isoDateNY(all[i].matched!.startsAt)).toBe("2026-11-23");
   });
 
-  it("reserves 1 to the seats left with a main per guest, blocks duplicates, never oversells, and resets to 6", async () => {
+  it("reserves 1 or 2 seats with a main per guest, blocks duplicates, never oversells, and resets to 6", async () => {
     await resetReginasTableDemo(db);
     const one = await reserveReginasTable(db, "gst_zoe", form(["PESTO"]), now);
     expect(one.ticketCount).toBe(1);
@@ -70,27 +72,33 @@ describe("Regina's Entrepreneurship Class Supper demo event", () => {
 
     // Double submission (also concurrent) never books twice.
     await expect(reserveReginasTable(db, "gst_zoe", form(), now)).rejects.toThrow(/already on the guest list/);
-    const three = ["MEAT_SAUCE", "PESTO", "MEAT_SAUCE"];
-    const twice = await Promise.allSettled([reserveReginasTable(db, "gst_jordan", form(three), now), reserveReginasTable(db, "gst_jordan", form(three), now)]);
+    const pair = ["MEAT_SAUCE", "PESTO"];
+    const twice = await Promise.allSettled([reserveReginasTable(db, "gst_jordan", form(pair), now), reserveReginasTable(db, "gst_jordan", form(pair), now)]);
     expect(twice.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     const jordan = (twice.find((r) => r.status === "fulfilled") as PromiseFulfilledResult<Awaited<ReturnType<typeof reserveReginasTable>>>).value;
-    expect(jordan.tickets.map((t) => t.mealChoice)).toEqual(["Pasta with meat sauce", "Vegetarian pesto pasta", "Pasta with meat sauce"]);
+    expect(jordan.tickets.map((t) => t.mealChoice)).toEqual(["Pasta with meat sauce", "Vegetarian pesto pasta"]);
     expect(jordan.tickets[1].attendeeName).toBe("Sam");
-    expect(await seats()).toBe(2);
+    expect(await seats()).toBe(3);
 
-    // Capacity can't be exceeded: 3 seats when 2 are left is refused, 2 fills the table.
-    await expect(reserveReginasTable(db, "gst_sofia", form(three), now)).rejects.toThrow(/Only 2 seats are left/);
-    expect(await seats()).toBe(2);
-    await reserveReginasTable(db, "gst_sofia", form(["MEAT_SAUCE", "PESTO"]), now);
+    // At most 2 seats per reservation (you and a +1), even with seats to spare.
+    expect(reginaReservationSchema.safeParse({ sessionId: REGINA_SESSION_ID, contactName: "Sofia", contactEmail: "s@example.com", ticketCount: 3, mains: ["PESTO", "PESTO", "PESTO"] }).success).toBe(false);
+    await expect(reserveReginasTable(db, "gst_sofia", { ...form(pair), ticketCount: 3, mains: [...pair, "PESTO"] }, now)).rejects.toThrow(/Reserve 1 or 2 seats/);
+    expect(await seats()).toBe(3);
+
+    // Capacity can't be exceeded: 2 seats when 1 is left is refused, 1 fills the table.
+    await reserveReginasTable(db, "gst_sofia", form(pair), now);
+    expect(await seats()).toBe(1);
+    await expect(reserveReginasTable(db, "gst_alex", form(pair), now)).rejects.toThrow(/Only 1 seat is left/);
+    await reserveReginasTable(db, "gst_alex", form(["PESTO"]), now);
     expect(await seats()).toBe(0);
-    await expect(reserveReginasTable(db, "gst_alex", form(["PESTO"]), now)).rejects.toThrow(/sold out/);
+    await expect(reserveReginasTable(db, "gst_bg-3", form(["PESTO"]), now)).rejects.toThrow(/sold out/);
 
     // A cancelled demo reservation frees its seats.
     await cancelBooking(db, { bookingId: jordan.id, actor: "GUEST", guestId: "gst_jordan" }, now);
-    expect(await seats()).toBe(3);
+    expect(await seats()).toBe(2);
 
     const r = await resetReginasTableDemo(db);
-    expect(r).toEqual({ removed: 3, seatsLeft: 6 });
+    expect(r).toEqual({ removed: 4, seatsLeft: 6 });
     expect(await seats()).toBe(6);
     expect(await db.booking.count({ where: { sessionId: REGINA_SESSION_ID } })).toBe(5); // seeded guest list kept
   });
@@ -107,7 +115,8 @@ describe("Regina's Entrepreneurship Class Supper demo event", () => {
     expect(reginaBookLabel(1)).toBe("Reserve 1 seat — Free");
     expect(reginaBookLabel(3)).toBe("Reserve 3 seats — Free");
     expect(reginaPartySize(0, 6, 8)).toBe(1);
-    expect(reginaPartySize(9, 6, 8)).toBe(6);
+    expect(reginaPartySize(9, 6, 2)).toBe(2);
+    expect(reginaPartySize(2, 1, 2)).toBe(1);
     expect(reginaPartySize("abc", 6, 8)).toBe(1);
     expect(reginaPartySize(4, 6, 8)).toBe(4);
   });
