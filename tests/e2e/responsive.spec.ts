@@ -54,3 +54,26 @@ test("form controls have accessible names", async ({ page }) => {
     expect(unlabeled, path).toEqual([]);
   }
 });
+
+test("phone event page: fold-down sections and a sticky Reserve your spot bar", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/experiences/levantine-long-table-dinner");
+  const menu = page.getByTestId("section-menu").getByRole("button");
+  await expect(menu).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#menu-body")).toBeHidden();
+  await menu.click();
+  await expect(menu).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#menu-body")).toBeVisible();
+
+  const bar = page.getByTestId("mobile-reserve-bar");
+  await expect(bar.getByRole("button", { name: "Reserve your spot" })).toBeVisible();
+  await bar.getByRole("button", { name: "Reserve your spot" }).click();
+  await expect(page.locator("#book")).toBeInViewport();
+  await expect(bar).toHaveAttribute("aria-hidden", "true");
+
+  // Desktop: everything open, no bar.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.reload();
+  await expect(page.locator("#reviews-body")).toBeVisible();
+  await expect(bar).toBeHidden();
+});
