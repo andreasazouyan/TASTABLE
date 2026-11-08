@@ -2,11 +2,12 @@ import "server-only";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
+import { databaseUrl } from "@/lib/database-url";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function createClient() {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = databaseUrl();
   if (!connectionString) throw new Error("DATABASE_URL is not set. See .env.example.");
   // Small pool: serverless functions each hold their own connections.
   const adapter = new PrismaPg({ connectionString, max: 5 });

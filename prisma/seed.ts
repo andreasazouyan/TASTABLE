@@ -12,6 +12,7 @@ import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { directDatabaseUrl } from "../src/lib/database-url";
 import { quote } from "../src/lib/booking/pricing";
 import { computeRefund, policySnapshot } from "../src/lib/booking/refunds";
 import { nyDateTime, serverNow } from "../src/lib/clock";
@@ -29,7 +30,7 @@ import {
 } from "./seed-data";
 
 const db = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+  adapter: new PrismaPg({ connectionString: directDatabaseUrl() }),
 });
 
 // ─── Deterministic helpers ───────────────────────────────────────────────────

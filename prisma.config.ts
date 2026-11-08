@@ -1,6 +1,8 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+import { directDatabaseUrl } from "./src/lib/database-url";
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
@@ -10,6 +12,6 @@ export default defineConfig({
   datasource: {
     // Migrations prefer the direct (unpooled) Neon URL when the Vercel integration provides one.
     // Falls back to a local default so `npm install` (which runs prisma generate) works before .env exists.
-    url: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/tastable",
+    url: directDatabaseUrl() ?? "postgresql://postgres:postgres@localhost:5432/tastable",
   },
 });

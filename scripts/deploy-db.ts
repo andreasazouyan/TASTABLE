@@ -9,9 +9,17 @@ import "dotenv/config";
 import { execSync } from "node:child_process";
 import { Client } from "pg";
 
+import { DATABASE_URL_NAMES, directDatabaseUrl } from "../src/lib/database-url";
+
 async function main() {
-  const migrateUrl = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
-  if (!migrateUrl) throw new Error("DATABASE_URL is not set. Connect a Postgres database (for example Neon) first.");
+  const migrateUrl = directDatabaseUrl();
+  if (!migrateUrl) {
+    const env = process.env.VERCEL_ENV ?? "this";
+    throw new Error(
+      `No database connection string in the ${env} environment (looked for ${DATABASE_URL_NAMES.join(", ")}). ` +
+        `In Vercel: project > Storage > create or select a Neon database > Connect Project, tick ${env === "this" ? "all environments" : `"${env}"`}, then redeploy.`,
+    );
+  }
 
   execSync("npx prisma migrate deploy", { stdio: "inherit" });
 
