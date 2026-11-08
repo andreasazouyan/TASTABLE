@@ -7,7 +7,7 @@ import { Suspense } from "react";
 import { GUEST_NAV, isActive } from "@/lib/navigation/guest";
 import { cn } from "@/lib/utils";
 
-/** Desktop primary navigation with an animated active underline. */
+/** Desktop primary navigation. The active tab is a rounded pill, matching the mode switch. */
 export function GuestNavLinks({ className }: { className?: string }) {
   return (
     <Suspense fallback={<NavList pathname="" className={className} />}>
@@ -31,18 +31,11 @@ function NavList({ pathname, className }: { pathname: string; className?: string
               href={item.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "group relative inline-flex h-10 items-center rounded-full px-3 text-sm transition-colors duration-200 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none",
-                active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                "inline-flex h-9 items-center rounded-full px-3.5 text-sm whitespace-nowrap transition-colors duration-200 focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none",
+                active ? "bg-secondary font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               {item.label}
-              <span
-                aria-hidden
-                className={cn(
-                  "absolute inset-x-3 bottom-1.5 h-px origin-left bg-brand transition-transform duration-300 ease-soft",
-                  active ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100 group-hover:bg-foreground/30",
-                )}
-              />
             </Link>
           </li>
         );
