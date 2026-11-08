@@ -1,5 +1,5 @@
 /**
- * Regina's Entrepreneurship Class Supper: the special, complimentary Tastable demo event
+ * Tastable Team's Entrepreneurship Class Supper (cooked by Regina): the special, complimentary Tastable demo event
  * (Monday, November 23, 2026) with its own reservation flow: reserve 1 or 2 seats (you
  * and a +1, within the seats left), each guest picks a main course, and the total is always $0.
  *
@@ -20,7 +20,10 @@ export const REGINA_SEEDED_SEATS = 9;
 /** Bookings created by the seed carry this id prefix; the reset never touches them. */
 export const REGINA_SEEDED_BOOKING_PREFIX = "bkg_regina_";
 
-export const REGINA_TITLE = "Regina's Entrepreneurship Class Supper";
+export const REGINA_TITLE = "Tastable Team's Entrepreneurship Class Supper";
+/** Shown as the host on cards and the event page (Andréas, Nov 8). */
+export const REGINA_HOST_NAME = "Tastable Team";
+export const REGINA_HOSTED_BY = "Hosted by the Tastable Team";
 /** "Only 3 spots available — and you can bring a +1!": at most 2 seats per reservation (Andréas, Nov 8). */
 export const REGINA_MAX_SEATS = 2;
 export const REGINA_PRICE_NOTE = "Complimentary experience — Special Tastable Demo Event";

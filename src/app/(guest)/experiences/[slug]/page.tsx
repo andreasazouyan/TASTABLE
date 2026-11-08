@@ -28,7 +28,7 @@ import { requestNow } from "@/lib/request-clock";
 import { db } from "@/lib/db";
 import { getExperienceDetail } from "@/server/queries/listings";
 import { ReginaResetPanel } from "@/components/booking/regina-reset-panel";
-import { demoToolsEnabled, isReginasTable, REGINA_MAX_SEATS, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
+import { demoToolsEnabled, isReginasTable, REGINA_HOSTED_BY, REGINA_MAX_SEATS, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
 import { findReginaReservation } from "@/server/services/reginas-table";
 
 export default function ExperiencePage(props: PageProps<"/experiences/[slug]">) {
@@ -132,6 +132,11 @@ async function Detail({ params, searchParams }: PageProps<"/experiences/[slug]">
             {exp.isFictional && <SampleBadge variant="outline" />}
           </div>
           <h1 className="text-4xl leading-[1.05] sm:text-5xl">{exp.title}</h1>
+          {regina && (
+            <p className="mt-2 text-base font-medium text-accent-foreground" data-testid="hosted-by">
+              {REGINA_HOSTED_BY}
+            </p>
+          )}
           <p className="mt-3 text-lg text-muted-foreground">{exp.summary}</p>
           <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1.5">

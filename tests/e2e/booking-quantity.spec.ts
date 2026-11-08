@@ -47,7 +47,7 @@ test("booking card: seat stepper, live total, Reserve N seats, carried into chec
   expect(after).toBe(before - 2);
 });
 
-test("booking card: Regina's Table uses the standard selector capped at 2, $0 total, quantity carried to its reservation form", async ({ page }) => {
+test("booking card: the Tastable Team supper (Regina's Table) uses the standard selector capped at 2, $0 total, quantity carried to its reservation form", async ({ page }) => {
   await signInAs(page, /Jordan/);
   await page.goto("/experiences/reginas-table-supper-club");
   const card = page.getByTestId("seat-quantity");
