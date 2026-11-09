@@ -30,7 +30,7 @@ describe("Tastable Team's Entrepreneurship Class Supper demo event", () => {
   it("is seeded once: one session on Mon Nov 23 at 8:30 PM New York time, 15 seats, 6 left, $0", async () => {
     const exp = await db.experience.findUniqueOrThrow({ where: { slug: REGINA_SLUG }, include: { sessions: true, venue: true, host: true, menuSections: { include: { items: true } }, itinerary: true } });
     expect(exp.title).toBe(REGINA_TITLE);
-    expect(exp.description).toMatch(/^Regina and the Tastable team are excited to invite you/);
+    expect(exp.description).toMatch(/^The Tastable team are excited to invite you/);
     expect(JSON.parse(exp.highlights)).toContain("Only 3 spots available — and you can bring a +1!");
     expect(await db.experience.count({ where: { title: exp.title } })).toBe(1);
     expect(exp.sessions).toHaveLength(1);
