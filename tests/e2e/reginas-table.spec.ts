@@ -24,7 +24,7 @@ test("Tastable Team's Entrepreneurship Class Supper: on Nov 23 in Discover, rese
   await expect(page.getByTestId("price-note")).toHaveText("Complimentary experience — Special Tastable Demo Event");
   await expect(page.getByText("2 hr 30 min").first()).toBeVisible();
   await expect(page.getByText("500 Riverside Drive, Manhattan, NY 10027")).toBeVisible();
-  await expect(page.getByText(/Regina and the Tastable team are excited to invite you/)).toBeVisible();
+  await expect(page.getByText(/The Tastable team are excited to invite you/)).toBeVisible();
   await expect(page.getByText("Only 3 spots available — and you can bring a +1!")).toBeVisible();
   for (const t of ["Fresh green salad", "Pasta with meat sauce", "Vegetarian pesto pasta", "Chocolate cake", "Welcome drinks and mingling", "Three-course dinner", "Socializing and conversation"]) {
     await expect(page.getByText(t, { exact: true }).first()).toBeVisible();

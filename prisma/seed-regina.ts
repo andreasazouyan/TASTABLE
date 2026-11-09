@@ -58,9 +58,9 @@ const MENU = [
 ];
 
 /** Kept here so existing databases can be updated in place (scripts/reginas-table.ts). */
-/** Andréas's copy (Nov 6): two paragraphs, shown with their line break. */
+/** Andréas's copy (Nov 6, "Regina and" removed Nov 9): two paragraphs, shown with their line break. */
 export const REGINA_DESCRIPTION =
-  "Regina and the Tastable team are excited to invite you to International House for a fun evening of food, conversation, and connection!\n\n" +
+  "The Tastable team are excited to invite you to International House for a fun evening of food, conversation, and connection!\n\n" +
   "As part of our Entrepreneurship class, we're testing Tastable, our new platform for discovering unique culinary experiences. Join us for a homemade three-course dinner, meet new people, and help us bring our concept to life!";
 export const REGINA_HIGHLIGHTS = [
   "Just 15 guests around one table",
