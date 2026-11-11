@@ -41,3 +41,20 @@ describe("snippet", () => {
     expect(out.endsWith("word…")).toBe(true);
   });
 });
+
+describe("PRIVATE_PATHS", () => {
+  it("blocks the host dashboard without blocking public /hosts/ profiles", async () => {
+    const { PRIVATE_PATHS } = await import("@/lib/seo/site");
+    const blocks = (path: string) =>
+      PRIVATE_PATHS.some((rule) => {
+        const exact = rule.endsWith("$");
+        const pattern = "^" + rule.replace(/\$$/, "").replace(/[.+?^{}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + (exact ? "$" : "");
+        return new RegExp(pattern).test(path);
+      });
+    expect(blocks("/host")).toBe(true);
+    expect(blocks("/host/events")).toBe(true);
+    expect(blocks("/hosts/regina")).toBe(false);
+    expect(blocks("/experiences/x/book")).toBe(true);
+    expect(blocks("/experiences/x")).toBe(false);
+  });
+});
