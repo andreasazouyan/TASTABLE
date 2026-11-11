@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
@@ -28,10 +29,33 @@ import { ATMOSPHERES, cuisineLabel, dietaryLabel, FORMATS, HOST_TYPES, occasionL
 import { formatCompact, formatDate, formatDuration, formatPrice, formatTime } from "@/lib/format";
 import { requestNow } from "@/lib/request-clock";
 import { db } from "@/lib/db";
-import { getExperienceDetail } from "@/server/queries/listings";
+import { getExperienceDetail, getExperienceSeo } from "@/server/queries/listings";
+import { snippet } from "@/lib/seo/site";
 import { ReginaResetPanel } from "@/components/booking/regina-reset-panel";
 import { demoToolsEnabled, isReginasTable, REGINA_HOSTED_BY, REGINA_MAX_SEATS, REGINA_PRICE_NOTE } from "@/lib/domain/reginas-table";
 import { findReginaReservation } from "@/server/services/reginas-table";
+
+export async function generateMetadata({ params }: PageProps<"/experiences/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const exp = await getExperienceSeo(slug);
+  if (!exp) return { title: "Experience not found", robots: { index: false } };
+  const title = `${exp.title} in ${exp.venue.neighborhood}, NYC`;
+  const description = snippet(`${exp.summary} Hosted by ${exp.host.displayName}.`);
+  const cover = exp.photos[0];
+  const url = `/experiences/${exp.slug}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      url,
+      images: cover ? [{ url: cover.url, alt: cover.alt }] : undefined,
+    },
+  };
+}
 
 export default function ExperiencePage(props: PageProps<"/experiences/[slug]">) {
   return (

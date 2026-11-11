@@ -32,7 +32,11 @@ import { getListings } from "@/server/queries/listings";
 import { personalizeResults } from "@/server/queries/recommendations";
 import { DiscoverSkeleton } from "./skeleton";
 
-export const metadata: Metadata = { title: "Discover" };
+export const metadata: Metadata = {
+  title: "Discover supper clubs, cooking classes & pop-ups in NYC",
+  description:
+    "Browse supper clubs, cooking classes, pop-ups and social dining across the five boroughs, filtered by date, neighborhood and budget.",
+};
 
 export default function DiscoverPage({ searchParams }: PageProps<"/discover">) {
   return (

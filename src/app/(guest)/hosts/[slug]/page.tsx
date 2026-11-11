@@ -18,8 +18,31 @@ import { cuisineLabel, HOST_TYPES } from "@/lib/domain/taxonomy";
 import { formatDate } from "@/lib/format";
 import { requestNow } from "@/lib/request-clock";
 import { getPublicHostProfile } from "@/server/queries/host-profile";
+import { snippet } from "@/lib/seo/site";
 
-export const metadata: Metadata = { title: "Host profile" };
+export async function generateMetadata({ params }: PageProps<"/hosts/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const host = await db.hostProfile.findUnique({
+    where: { slug },
+    select: { slug: true, displayName: true, tagline: true, bio: true, profilePhotoUrl: true },
+  });
+  if (!host) return { title: "Host not found", robots: { index: false } };
+  const title = `${host.displayName}, food experiences in NYC`;
+  const description = snippet(host.tagline || host.bio);
+  const url = `/hosts/${host.slug}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "profile",
+      title,
+      description,
+      url,
+      images: host.profilePhotoUrl ? [{ url: host.profilePhotoUrl, alt: host.displayName }] : undefined,
+    },
+  };
+}
 
 export default function HostProfilePage(props: PageProps<"/hosts/[slug]">) {
   return (

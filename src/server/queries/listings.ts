@@ -121,6 +121,21 @@ export async function getExperienceDetail(slug: string) {
   });
 }
 
+/** The few fields search metadata needs; cheaper than the full detail read. */
+export async function getExperienceSeo(slug: string) {
+  return db.experience.findFirst({
+    where: { slug, status: "PUBLISHED" },
+    select: {
+      slug: true,
+      title: true,
+      summary: true,
+      host: { select: { displayName: true } },
+      venue: { select: { neighborhood: true } },
+      photos: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true, alt: true } },
+    },
+  });
+}
+
 export async function getMarketplaceStats() {
   const [experiences, hosts, neighborhoods] = await Promise.all([
     db.experience.count({ where: { status: "PUBLISHED" } }),

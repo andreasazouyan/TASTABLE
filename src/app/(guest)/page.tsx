@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
@@ -22,6 +23,8 @@ import { getRecommendations } from "@/server/queries/recommendations";
  * Guest Home: a compact marketplace. Search first, then the four categories, then four
  * carousels. Discover is where full search, filters and date-first browsing live.
  */
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
 export default function HomePage() {
   return (
     <>
