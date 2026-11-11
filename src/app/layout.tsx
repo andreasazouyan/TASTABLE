@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           Skip to content
         </a>
         {children}
+        <Analytics />
       </body>
     </html>
   );
