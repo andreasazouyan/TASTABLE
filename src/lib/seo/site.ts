@@ -21,7 +21,8 @@ export function indexingAllowed(): boolean {
 
 /** Pages that are personal, transactional or token-gated. Kept out of search results. */
 export const PRIVATE_PATHS = [
-  "/host",
+  "/host$",
+  "/host/",
   "/bookings",
   "/profile",
   "/saved",
